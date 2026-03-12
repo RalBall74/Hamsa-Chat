@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-G2QMJNENRV"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-G2QMJNENRV');
+</script>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hamsa Chat</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6d28d9">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <!-- App Container -->
+    <div id="hamsa-app" class="hidden">
+        <!-- Sidebar Navigation -->
+        <nav class="side-rail">
+            <div class="logo-circle"><img src="assets/logo.jpg" alt="Hamsa Logo"></div>
+            <div class="nav-links">
+                <button class="nav-item active" data-page="chats" title="Messages"><i
+                        data-lucide="message-circle"></i></button>
+                <button class="nav-item" data-page="stories" title="Stories"><i
+                        data-lucide="circle-dashed"></i></button>
+                <button class="nav-item" data-page="archive" title="Archive"><i data-lucide="archive"></i></button>
+            </div>
+            <div class="nav-bottom">
+                <button class="nav-item" data-page="settings" title="Settings"><i data-lucide="settings"></i></button>
+                <div id="current-user-avatar" class="user-avatar-trigger">
+                    <div style="width: 44px; height: 44px; border-radius: 50%; background: white;"></div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Listing Area -->
+        <aside class="content-sidebar">
+            <header class="sidebar-header">
+                <div class="sidebar-header-top">
+                    <h1 id="page-title">Chats</h1>
+                    <div id="mobile-user-avatar" class="user-avatar-trigger"
+                        style="width: 36px; height: 36px; border-radius: 50%; background: white; cursor: pointer; flex-shrink: 0;">
+                    </div>
+                </div>
+                <div class="search-box">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="global-search" placeholder="Search accounts and chats...">
+                </div>
+            </header>
+
+            <div id="sidebar-list" class="scrollbar-hidden">
+                <div class="info-state" style="margin-top: 50px;">Initializing Hamsa...</div>
+            </div>
+
+            <button id="main-action-btn" class="fab-btn">
+                <i data-lucide="plus"></i>
+            </button>
+        </aside>
+
+        <!-- Focus Area -->
+        <main class="main-stage">
+            <div id="empty-state" class="stage-overlay">
+            </div>
+
+            <div id="chat-window" class="hidden">
+                <!-- Javascript will inject chat logic here -->
+            </div>
+
+            <div id="page-content" class="hidden stage-overlay">
+                <!-- Javascript will inject settings/profile forms here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Login Authentication Overlay -->
+    <div id="auth-overlay" class="hidden">
+        <div class="auth-container" id="auth-container">
+            <!-- Sign In Panel -->
+            <div class="auth-form-container sign-in">
+                <div class="auth-form">
+                    <div class="auth-logo">
+                        <img src="assets/logo.jpg" alt="Hamsa Logo">
+                    </div>
+                    <h1>Welcome Back</h1>
+                    <p>Rejoin the most beautiful and secure messaging experience.</p>
+                    <button class="auth-google-btn" onclick="app.login()">
+                        <img src="assets/Google.png" alt="Google">
+                        Sign in with Google
+                    </button>
+                    <span class="auth-footnote">Privacy is our priority. No trackers.</span>
+                    <button class="auth-mobile-toggle"
+                        onclick="document.getElementById('auth-container').classList.add('active')">
+                        New to Hamsa? <span>Learn More</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Benefits/Showcase Panel -->
+            <div class="auth-form-container benefits-view">
+                <div class="auth-form">
+                    <div class="benefits-icons">
+                        <i data-lucide="shield-check"></i>
+                        <i data-lucide="zap"></i>
+                        <i data-lucide="layout"></i>
+                    </div>
+                    <h1>Hamsa Premium</h1>
+                    <p>End-to-end encrypted messaging with hardware-accelerated glassmorphism patterns.</p>
+                    <button class="auth-mobile-toggle"
+                        onclick="document.getElementById('auth-container').classList.remove('active')">
+                        Ready to sign in? <span>Go Back</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sliding Toggle -->
+            <div class="auth-toggle-container">
+                <div class="auth-toggle">
+                    <div class="auth-toggle-panel auth-toggle-left">
+                        <h1>New to Hamsa?</h1>
+                        <p>Discover a minimal paradigm designed for focused collaboration.</p>
+                        <button class="auth-sec-btn"
+                            onclick="document.getElementById('auth-container').classList.remove('active')">Back to
+                            Login</button>
+                    </div>
+                    <div class="auth-toggle-panel auth-toggle-right">
+                        <h1>Secure. Pure.</h1>
+                        <p>Experience the future of real-time communication today.</p>
+                        <button class="auth-sec-btn"
+                            onclick="document.getElementById('auth-container').classList.add('active')">Learn
+                            More</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Lock Overlay -->
+    <div id="app-lock-overlay" class="hidden">
+        <div class="lock-container">
+            <img src="assets/logo.jpg" alt="Logo" class="lock-logo">
+            <h2 id="lock-title">Hamsa Locked</h2>
+            <div class="pin-display" id="pin-display">
+                <div class="pin-dot"></div>
+                <div class="pin-dot"></div>
+                <div class="pin-dot"></div>
+                <div class="pin-dot"></div>
+            </div>
+            <div class="pin-numpad">
+                <button class="numpad-btn" onclick="app.handlePinInput('1')">1</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('2')">2</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('3')">3</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('4')">4</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('5')">5</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('6')">6</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('7')">7</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('8')">8</button>
+                <button class="numpad-btn" onclick="app.handlePinInput('9')">9</button>
+                <button class="numpad-btn" style="visibility: hidden;"></button>
+                <button class="numpad-btn" onclick="app.handlePinInput('0')">0</button>
+                <button class="numpad-btn" onclick="app.clearPin()"><i data-lucide="delete"></i></button>
+            </div>
+            <button id="lock-logout-btn" class="btn-ghost" style="margin-top: 40px; border: none !important; color: white; opacity: 0.6;" onclick="app.logout()">Sign Out</button>
+        </div>
+    </div>
+
+    <!-- General Universal Interactions Modal -->
+    <div id="modal-overlay" class="hidden">
+        <div id="modal-content" class="modal-card"></div>
+    </div>
+
+    <!-- PWA Install Prompt -->
+    <div id="install-prompt">
+        <div class="prompt-content">
+            <img src="assets/logo.jpg" alt="Hamsa" class="prompt-icon">
+            <div class="prompt-text">
+                <h4 id="prompt-title">Get Hamsa App</h4>
+                <p id="prompt-desc">Install for a better experience</p>
+            </div>
+        </div>
+        <div class="prompt-actions">
+            <button class="btn-ghost" onclick="app.dismissInstall()" style="font-size: 13px; padding: 6px 12px; border: none !important;">Later</button>
+            <button class="glass-btn" onclick="app.installApp()" style="font-size: 13px; padding: 6px 14px; border-radius: 10px;">Download</button>
+        </div>
+    </div>
+
+    <!-- Entry Script -->
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>

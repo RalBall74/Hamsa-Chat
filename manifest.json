@@ -1,0 +1,23 @@
+{
+    "name": "Hamsa Chat",
+    "short_name": "Hamsa",
+    "description": "Premium glassmorphism messaging app",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#F0F2F5",
+    "theme_color": "#6d28d9",
+    "icons": [
+        {
+            "src": "assets/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "assets/icons/icon-192.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}
