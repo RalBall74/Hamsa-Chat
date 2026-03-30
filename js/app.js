@@ -1,7 +1,7 @@
 import {
     auth, db, googleProvider,
     onAuthStateChanged, signInWithPopup, signOut,
-    collection, onSnapshot, query, orderBy, where, doc, getDoc, setDoc, serverTimestamp, getDocs, writeBatch, addDoc, updateDoc, deleteDoc, limit, increment, deleteField
+    collection, onSnapshot, query, orderBy, where, doc, getDoc, setDoc, serverTimestamp, getDocs, writeBatch, addDoc, updateDoc, deleteDoc, limit
 } from './firebase-config.js';
 
 class HamsterApp {
@@ -450,9 +450,6 @@ class HamsterApp {
             const partner = this.getChatPartner(chat);
             const active = chat.id === this.activeChatId ? 'active' : '';
             const lastMsg = chat.lastMessage?.text || "Started conversation";
-            
-            const unreadCount = chat.unreadCounts?.[this.user.uid] || 0;
-            const badgeHTML = unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : '';
 
             return `
                 <div class="chat-card ${active}" onclick="app.selectChat('${chat.id}')">
@@ -460,7 +457,6 @@ class HamsterApp {
                     <div class="card-body">
                         <div class="card-top">
                             <h4>${partner.name}</h4>
-                            ${badgeHTML}
                         </div>
                         <p>${lastMsg}</p>
                     </div>
@@ -561,13 +557,6 @@ class HamsterApp {
         if (!chat) return;
 
         this.renderFilteredChats(); // updates active class
-
-        // Reset unread count for this user
-        if (chat.unreadCounts?.[this.user.uid]) {
-            await updateDoc(doc(db, 'chats', chatId), {
-                [`unreadCounts.${this.user.uid}`]: deleteField()
-            });
-        }
 
         const chatWindow = document.getElementById('chat-window');
         document.getElementById('page-content').classList.add('hidden');
@@ -900,17 +889,9 @@ class HamsterApp {
 
             batch.set(msgRef, payload);
 
-            const unreadUpdates = {};
-            chat.memberIds.forEach(uid => {
-                if (uid !== this.user.uid) {
-                    unreadUpdates[`unreadCounts.${uid}`] = increment(1);
-                }
-            });
-
             batch.set(doc(db, 'chats', chatId), {
                 lastMessage: { text, senderId: this.user.uid, msgId: msgRef.id },
-                updatedAt: serverTimestamp(),
-                ...unreadUpdates
+                updatedAt: serverTimestamp()
             }, { merge: true });
 
             await batch.commit();
@@ -945,17 +926,9 @@ class HamsterApp {
 
             batch.set(msgRef, payload);
 
-            const unreadUpdates = {};
-            chat.memberIds.forEach(uid => {
-                if (uid !== this.user.uid) {
-                    unreadUpdates[`unreadCounts.${uid}`] = increment(1);
-                }
-            });
-
             batch.set(doc(db, 'chats', chatId), {
                 lastMessage: { text, senderId: this.user.uid, msgId: msgRef.id },
-                updatedAt: serverTimestamp(),
-                ...unreadUpdates
+                updatedAt: serverTimestamp()
             }, { merge: true });
 
             await batch.commit();
