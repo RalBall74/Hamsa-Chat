@@ -1,6 +1,6 @@
 {
-    "name": "Hamsa Chat",
-    "short_name": "Hamsa",
+    "name": "Hamster Chat",
+    "short_name": "Hamster",
     "description": "Premium glassmorphism messaging app",
     "start_url": "index.html",
     "display": "standalone",
@@ -14,9 +14,9 @@
             "purpose": "any maskable"
         },
         {
-            "src": "assets/icons/icon-192.png",
+            "src": "assets/logo.jpg",
             "sizes": "512x512",
-            "type": "image/png",
+            "type": "image/jpg",
             "purpose": "any"
         }
     ]

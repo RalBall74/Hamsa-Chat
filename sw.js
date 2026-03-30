@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hamsa-chat-v2';
+const CACHE_NAME = 'hamster-chat-v2';
 const STATIC_ASSETS = [
     './',
     './index.html',

@@ -42,7 +42,7 @@ body::before {
     display: none;
 }
 
-#hamsa-app {
+#hamster-app {
     display: flex;
     width: 95vw;
     height: 95vh;
@@ -1385,7 +1385,7 @@ body::before {
         display: block !important;
     }
 
-    #hamsa-app {
+    #hamster-app {
         width: 100vw;
         height: 100vh;
         height: 100dvh;
@@ -1419,7 +1419,7 @@ body::before {
         height: 65px;
         width: 100%;
         position: absolute;
-        /* Anchor to #hamsa-app instead of viewport */
+        /* Anchor to #hamster-app instead of viewport */
         bottom: 0;
         left: 0;
         right: 0;
@@ -1486,7 +1486,7 @@ body::before {
     #chat-window:not(.hidden),
     #page-content:not(.hidden) {
         position: absolute;
-        /* Anchor to #hamsa-app bounds */
+        /* Anchor to #hamster-app bounds */
         top: 0;
         left: 0;
         right: 0;
@@ -1853,4 +1853,27 @@ body::before {
         width: 380px;
     }
 }
+
+/* Unread Badge */
+.unread-badge {
+    background: var(--accent);
+    color: white;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+    animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badgePop {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
 

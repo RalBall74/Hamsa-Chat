@@ -1,10 +1,10 @@
 import {
     auth, db, googleProvider,
     onAuthStateChanged, signInWithPopup, signOut,
-    collection, onSnapshot, query, orderBy, where, doc, getDoc, setDoc, serverTimestamp, getDocs, writeBatch, addDoc, updateDoc, deleteDoc, limit
+    collection, onSnapshot, query, orderBy, where, doc, getDoc, setDoc, serverTimestamp, getDocs, writeBatch, addDoc, updateDoc, deleteDoc, limit, increment, deleteField
 } from './firebase-config.js';
 
-class HamsaApp {
+class HamsterApp {
     constructor() {
         this.user = null;
         this.userData = null;
@@ -31,7 +31,7 @@ class HamsaApp {
                 app_theme: "App Theme", light_mode: "Light Mode", dark_mode: "Dark Mode",
                 desktop_notifs: "Enable Desktop Notifications", read_receipts: "Broadcast Read Meta-Receipts",
                 commit: "Commit Changes", language: "Language", english: "English", arabic: "Arabic",
-                display_name: "Display Name", about_app: "About Hamsa"
+                display_name: "Display Name", about_app: "About Hamster Chat"
             },
             ar: {
                 chats: "المحادثات", messages: "الرسائل", stories: "القصص", archive: "الأرشيف", settings: "التفضيلات",
@@ -121,7 +121,7 @@ class HamsaApp {
     }
 
     loadLang() {
-        this.lang = localStorage.getItem('hamsa-lang') || 'en';
+        this.lang = localStorage.getItem('hamster-lang') || 'en';
         document.documentElement.dir = this.lang === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = this.lang;
         this.updateStaticUI();
@@ -129,7 +129,7 @@ class HamsaApp {
 
     setLang(l) {
         this.lang = l;
-        localStorage.setItem('hamsa-lang', l);
+        localStorage.setItem('hamster-lang', l);
         document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = l;
         this.updateStaticUI();
@@ -144,7 +144,7 @@ class HamsaApp {
     }
 
     loadTheme() {
-        const savedTheme = localStorage.getItem('hamsa-theme');
+        const savedTheme = localStorage.getItem('hamster-theme');
         let theme = 'light';
 
         if (savedTheme) {
@@ -158,7 +158,7 @@ class HamsaApp {
     }
 
     setTheme(theme) {
-        localStorage.setItem('hamsa-theme', theme);
+        localStorage.setItem('hamster-theme', theme);
         document.documentElement.setAttribute('data-theme', theme);
         this.updateThemeColor(theme);
     }
@@ -182,7 +182,7 @@ class HamsaApp {
 
                 // Show App immediately for better UX
                 document.getElementById('auth-overlay').classList.add('hidden');
-                document.getElementById('hamsa-app').classList.remove('hidden');
+                document.getElementById('hamster-app').classList.remove('hidden');
 
                 // Initialize with basic auth data first
                 this.userData = {
@@ -212,15 +212,15 @@ class HamsaApp {
                         this.showLockScreen();
                     }
                     
-                    console.log("Hamsa: Session Synced", user.email);
+                    console.log("Hamster: Session Synced", user.email);
                 } catch (e) {
-                    console.error("Hamsa: Sync failed (working offline?)", e);
+                    console.error("Hamster: Sync failed (working offline?)", e);
                 }
             } else {
                 this.user = null;
                 this.userData = null;
                 // Show Login
-                document.getElementById('hamsa-app').classList.add('hidden');
+                document.getElementById('hamster-app').classList.add('hidden');
                 document.getElementById('auth-overlay').classList.remove('hidden');
                 if (window.lucide) lucide.createIcons({ node: document.getElementById('auth-overlay') });
             }
@@ -450,6 +450,9 @@ class HamsaApp {
             const partner = this.getChatPartner(chat);
             const active = chat.id === this.activeChatId ? 'active' : '';
             const lastMsg = chat.lastMessage?.text || "Started conversation";
+            
+            const unreadCount = chat.unreadCounts?.[this.user.uid] || 0;
+            const badgeHTML = unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : '';
 
             return `
                 <div class="chat-card ${active}" onclick="app.selectChat('${chat.id}')">
@@ -457,6 +460,7 @@ class HamsaApp {
                     <div class="card-body">
                         <div class="card-top">
                             <h4>${partner.name}</h4>
+                            ${badgeHTML}
                         </div>
                         <p>${lastMsg}</p>
                     </div>
@@ -497,7 +501,7 @@ class HamsaApp {
                             <div class="card-top">
                                 <h4>@${u.username}</h4>
                             </div>
-                            <p>${u.displayName || 'Hamsa User'}</p>
+                            <p>${u.displayName || 'Hamster User'}</p>
                         </div>
                     </div>
                 `).join('')}
@@ -557,6 +561,13 @@ class HamsaApp {
         if (!chat) return;
 
         this.renderFilteredChats(); // updates active class
+
+        // Reset unread count for this user
+        if (chat.unreadCounts?.[this.user.uid]) {
+            await updateDoc(doc(db, 'chats', chatId), {
+                [`unreadCounts.${this.user.uid}`]: deleteField()
+            });
+        }
 
         const chatWindow = document.getElementById('chat-window');
         document.getElementById('page-content').classList.add('hidden');
@@ -889,9 +900,17 @@ class HamsaApp {
 
             batch.set(msgRef, payload);
 
+            const unreadUpdates = {};
+            chat.memberIds.forEach(uid => {
+                if (uid !== this.user.uid) {
+                    unreadUpdates[`unreadCounts.${uid}`] = increment(1);
+                }
+            });
+
             batch.set(doc(db, 'chats', chatId), {
                 lastMessage: { text, senderId: this.user.uid, msgId: msgRef.id },
-                updatedAt: serverTimestamp()
+                updatedAt: serverTimestamp(),
+                ...unreadUpdates
             }, { merge: true });
 
             await batch.commit();
@@ -926,9 +945,17 @@ class HamsaApp {
 
             batch.set(msgRef, payload);
 
+            const unreadUpdates = {};
+            chat.memberIds.forEach(uid => {
+                if (uid !== this.user.uid) {
+                    unreadUpdates[`unreadCounts.${uid}`] = increment(1);
+                }
+            });
+
             batch.set(doc(db, 'chats', chatId), {
                 lastMessage: { text, senderId: this.user.uid, msgId: msgRef.id },
-                updatedAt: serverTimestamp()
+                updatedAt: serverTimestamp(),
+                ...unreadUpdates
             }, { merge: true });
 
             await batch.commit();
@@ -2313,7 +2340,7 @@ class HamsaApp {
                     <div style="width: 100px; height: 100px; border-radius: 28px; background: white; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden;">
                         <img src="assets/logo.jpg" style="width: 100%; height: 100%; object-fit: cover;">
                     </div>
-                    <h2 style="margin: 0; font-size: 28px; font-weight: 800; color: var(--text-primary);">Hamsa</h2>
+                    <h2 style="margin: 0; font-size: 28px; font-weight: 800; color: var(--text-primary);">Hamster Chat</h2>
                     <p style="margin: 8px 0 0; color: var(--text-secondary); font-size: 15px; opacity: 0.7;">Version 1.5.0-beta</p>
                 </div>
 
@@ -2884,7 +2911,7 @@ class HamsaApp {
             title.innerText = this.lang === 'ar' ? 'رمز خاطئ!' : 'Incorrect PIN!';
             title.style.color = '#ef4444';
             setTimeout(() => {
-                title.innerText = this.lang === 'ar' ? 'همسة مقفول' : 'Hamsa Locked';
+                title.innerText = this.lang === 'ar' ? 'هامستر مقفول' : 'Hamster Locked';
                 title.style.color = 'white';
             }, 1000);
         }
@@ -2927,7 +2954,7 @@ class HamsaApp {
 
     // --- Wallpaper System ---
     loadWallpaper() {
-        const saved = localStorage.getItem('hamsa-wallpaper');
+        const saved = localStorage.getItem('hamster-wallpaper');
         if (saved) {
             if (!this.userData) this.userData = {};
             this.userData.wallpaper = saved;
@@ -2937,7 +2964,7 @@ class HamsaApp {
     async setWallpaper(url) {
         if (!this.userData) this.userData = {};
         this.userData.wallpaper = url;
-        localStorage.setItem('hamsa-wallpaper', url);
+        localStorage.setItem('hamster-wallpaper', url);
         await updateDoc(doc(db, 'users', this.user.uid), { wallpaper: url });
         
         const area = document.getElementById('messages-area');
@@ -3028,7 +3055,7 @@ class HamsaApp {
                 <div class="privacy-item">
                     <div class="privacy-info">
                         <h4>${this.lang === 'ar' ? 'قفل التطبيق' : 'App Lock'}</h4>
-                        <p>${this.lang === 'ar' ? 'حماية التطبيق برمز PIN' : 'Require PIN to open Hamsa'}</p>
+                        <p>${this.lang === 'ar' ? 'حماية التطبيق برمز PIN' : 'Require PIN to open Hamster Chat'}</p>
                     </div>
                     <div class="toggle-switch ${appLockEnabled ? 'active' : ''}" onclick="app.toggleAppLock()"></div>
                 </div>
@@ -3097,7 +3124,7 @@ class HamsaApp {
 
     // --- PWA Installation Logic ---
     checkInstallPrompt() {
-        const isDismissed = localStorage.getItem('hamsa-install-dismissed');
+        const isDismissed = localStorage.getItem('hamster-install-dismissed');
         if (isDismissed || !this.deferredPrompt) return;
 
         const prompt = document.getElementById('install-prompt');
@@ -3108,7 +3135,7 @@ class HamsaApp {
             const btns = document.querySelectorAll('#install-prompt button');
 
             if (this.lang === 'ar') {
-                title.innerText = "تحميل تطبيق همسة";
+                title.innerText = "تحميل تطبيق هامستر";
                 desc.innerText = "ثبّت التطبيق لتجربة اتصال أفضل";
                 btns[0].innerText = "لاحقاً";
                 btns[1].innerText = "تنزيل الآن";
@@ -3123,7 +3150,7 @@ class HamsaApp {
         this.deferredPrompt.prompt();
         const { outcome } = await this.deferredPrompt.userChoice;
         if (outcome === 'accepted') {
-            console.log('Hamsa: User accepted install');
+            console.log('Hamster: User accepted install');
             this.dismissInstall();
         }
         this.deferredPrompt = null;
@@ -3132,10 +3159,10 @@ class HamsaApp {
     dismissInstall() {
         const prompt = document.getElementById('install-prompt');
         if (prompt) prompt.classList.remove('visible');
-        localStorage.setItem('hamsa-install-dismissed', 'true');
+        localStorage.setItem('hamster-install-dismissed', 'true');
     }
 }
 
 // Global Execution
-const app = new HamsaApp();
+const app = new HamsterApp();
 window.app = app;
