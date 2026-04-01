@@ -443,7 +443,7 @@ class HamsterApp {
                     memberIds: [this.user.uid, 'hamster_ai_bot'],
                     memberData: {
                         [this.user.uid]: { name: this.userData?.displayName || 'User', photo: this.userData?.photoURL },
-                        'hamster_ai_bot': { name: 'Hamster AI', photo: 'https://ui-avatars.com/api/?name=AI&background=6d28d9&color=fff' }
+                        'hamster_ai_bot': { name: 'Hamster AI', photo: 'assets/logo.jpg' }
                     },
                     lastMessage: { text: this.lang === 'ar' ? 'أهلاً! أنا المساعد الذكي هامستر.' : 'Hello! I am Hamster AI assistant.' }
                 });
@@ -619,20 +619,26 @@ class HamsterApp {
         const blockedBy = chat.blockedBy || [];
         const amIBlocked = blockedBy.length > 0;
 
+        const isAI = chatId === this.user.uid + '_ai';
+
         let inputAreaHTML = `
             <div class="input-area">
                 <div style="display: flex; flex-direction: column; gap: 8px; position: relative;" id="input-area-inner">
                     <div id="reply-to-placeholder"></div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <form id="msg-form" class="input-container" style="flex: 1;">
+                            ${!isAI ? `
                             <label style="cursor: pointer; color: var(--text-secondary); flex-shrink: 0;">
                                 <i data-lucide="image" style="width: 20px;"></i>
                                 <input type="file" accept="image/*" style="display: none;" onchange="app.handleChatImageUpload(event, '${chatId}')">
                             </label>
+                            ` : ''}
                             <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off" oninput="app.handleTyping('${chatId}')">
+                            ${!isAI ? `
                             <button type="button" id="voice-btn" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;" onmousedown="app.startRecording()" onmouseup="app.stopRecording()" ontouchstart="app.startRecording()" ontouchend="app.stopRecording()">
                                 <i data-lucide="mic" style="width: 20px;"></i>
                             </button>
+                            ` : ''}
                         </form>
                         <button type="button" onclick="app.handleSendMessage('${chatId}')" style="background: linear-gradient(135deg, var(--accent), var(--accent-light)); color: white; border: none; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(109, 40, 217, 0.35); flex-shrink: 0; transform: ${this.lang === 'ar' ? 'scaleX(-1)' : 'none'};">
                             <i data-lucide="send" style="width: 20px;"></i>
@@ -678,10 +684,12 @@ class HamsterApp {
                     </div>
                 </div>
                 <div style="display: flex; gap: 2px; flex-shrink: 0;">
+                    ${!isAI ? `
                     <button class="nav-item" onclick="app.toggleChatSearch()" title="Search in Chat"><i data-lucide="search"></i></button>
                     <button class="nav-item" onclick="app.toggleArchive('${chat.id}')" title="${archiveTitle}"><i data-lucide="${archiveIcon}"></i></button>
                     ${chat.type !== 'group' ? `<button class="nav-item" onclick="app.startCall('${chatId}')"><i data-lucide="phone"></i></button>` : ''}
                     <button class="nav-item" onclick="app.renderChatInfo('${chat.id}')"><i data-lucide="more-vertical"></i></button>
+                    ` : ''}
                 </div>
             </header>
             <div id="chat-search-container" class="hidden">
