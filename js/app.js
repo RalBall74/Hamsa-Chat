@@ -56,6 +56,12 @@ class HamsterApp {
         this.loadTheme();
         this.loadWallpaper();
         this.loadLock();
+        
+        // Show Lock Screen immediately if PIN exists in localStorage
+        if (this.userData?.appLockPin) {
+            this.showLockScreen();
+        }
+
         this.setupAuth();
         this.setupNav();
         this.setupSearch();
@@ -199,11 +205,6 @@ class HamsterApp {
                 this.listenForStories();
                 this.listenForCalls();
 
-                // Check App Lock
-                if (this.userData?.appLockPin && !this.isUnlockedSession) {
-                    this.showLockScreen();
-                }
-
                 // Sync with DB and handle App Lock
                 try {
                     await this.syncUser(user);
@@ -213,7 +214,8 @@ class HamsterApp {
                     if (this.userData?.appLockPin) localStorage.setItem('hamster-lock-pin', this.userData.appLockPin);
                     if (this.userData?.wallpaper) localStorage.setItem('hamster-wallpaper', this.userData.wallpaper);
 
-                    if (this.userData?.appLockPin && !this.isUnlockedSession) {
+                    // Re-check App Lock in case it was enabled on another device
+                    if (this.userData?.appLockPin && !this.isUnlockedSession && !this.isLocked) {
                         this.showLockScreen();
                     }
                     
@@ -224,6 +226,10 @@ class HamsterApp {
             } else {
                 this.user = null;
                 this.userData = null;
+                // Hide Lock Screen if shown from localStorage but no user session exists
+                document.getElementById('app-lock-overlay').classList.add('hidden');
+                this.isLocked = false;
+                
                 // Show Login
                 document.getElementById('hamster-app').classList.add('hidden');
                 document.getElementById('auth-overlay').classList.remove('hidden');
