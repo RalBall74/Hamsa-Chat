@@ -1270,7 +1270,17 @@ class HamsterApp {
             body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
         });
         const data = await res.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Hamster AI.';
+        console.log("Hamster AI Response:", data);
+
+        if (data.error) {
+            return `API Error: ${data.error.message}`;
+        }
+
+        if (data.candidates && data.candidates[0].finishReason === 'SAFETY') {
+            return 'عذراً، تم حجب الرد بسبب معايير السلامة.';
+        }
+
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Hamster AI. Check console for details.';
     }
 
     linkify(text) {
