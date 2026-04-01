@@ -604,18 +604,19 @@ class HamsterApp {
         let inputAreaHTML = `
             <div class="input-area">
                 <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <div id="reply-to-placeholder"></div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <form id="msg-form" class="input-container" style="flex: 1;">
-                            <label style="cursor: pointer; color: var(--text-secondary); flex-shrink: 0;">
-                                <i data-lucide="image" style="width: 20px;"></i>
-                                <input type="file" accept="image/*" style="display: none;" onchange="app.handleChatImageUpload(event, '${chatId}')">
-                            </label>
-                            <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off" oninput="app.handleTyping('${chatId}')">
-                            <button type="button" id="voice-btn" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;" onmousedown="app.startRecording()" onmouseup="app.stopRecording()" ontouchstart="app.startRecording()" ontouchend="app.stopRecording()">
-                                <i data-lucide="mic" style="width: 20px;"></i>
-                            </button>
-                        </form>
+                        <div id="reply-to-placeholder"></div>
+                        <div id="mentions-dropdown-container"></div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <form id="msg-form" class="input-container" style="flex: 1;">
+                                <label style="cursor: pointer; color: var(--text-secondary); flex-shrink: 0;">
+                                    <i data-lucide="image" style="width: 20px;"></i>
+                                    <input type="file" accept="image/*" style="display: none;" onchange="app.handleChatImageUpload(event, '${chatId}')">
+                                </label>
+                                <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off" oninput="app.handleTyping('${chatId}'); app.handleMentionsInput(event, '${chatId}')" onkeydown="app.handleMentionKeys(event)">
+                                <button type="button" id="voice-btn" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;" onmousedown="app.startRecording()" onmouseup="app.stopRecording()" ontouchstart="app.startRecording()" ontouchend="app.stopRecording()">
+                                    <i data-lucide="mic" style="width: 20px;"></i>
+                                </button>
+                            </form>
                         <button type="button" onclick="app.handleSendMessage('${chatId}')" style="background: linear-gradient(135deg, var(--accent), var(--accent-light)); color: white; border: none; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(109, 40, 217, 0.35); flex-shrink: 0; transform: ${this.lang === 'ar' ? 'scaleX(-1)' : 'none'};">
                             <i data-lucide="send" style="width: 20px;"></i>
                         </button>
@@ -833,7 +834,11 @@ class HamsterApp {
                     `;
                     extraBubbleClass = 'wa-audio-bubble';
                 } else {
-                    contentStr = this.linkify(msg.text || '');
+                    let text = msg.text || '';
+                    text = this.linkify(text);
+                    text = this.mentionify(text);
+                    
+                    contentStr = text;
                     if (msg.edited) {
                         contentStr += ` <span style="font-size: 10px; opacity: 0.7; font-style: italic;">(${this.lang === 'ar' ? 'معدلة' : 'edited'})</span>`;
                     }
@@ -1038,6 +1043,8 @@ class HamsterApp {
         if (!text) return;
 
         input.value = '';
+        this.closeMentionsDropdown();
+
         try {
             const batch = writeBatch(db);
             const msgRef = doc(collection(db, `chats/${chatId}/messages`));
@@ -1096,6 +1103,81 @@ class HamsterApp {
         return text.replace(urlRegex, (url) => {
             return `<a href="${url}" target="_blank" style="color: inherit; text-decoration: underline;">${url}</a>`;
         });
+    }
+
+    mentionify(text) {
+        // Regex for @Names (assuming they have at least 2 chars after @ and don't end in punctuation)
+        const mentionRegex = /(@[A-Za-z0-9._]+)/g;
+        return text.replace(mentionRegex, (match) => {
+            return `<span class="mention-highlight">${match}</span>`;
+        });
+    }
+
+    handleMentionsInput(e, chatId) {
+        const input = e.target;
+        const val = input.value;
+        const cursorP = input.selectionStart;
+        const chat = this.allChats.find(c => c.id === chatId);
+        
+        if (chat.type !== 'group') return;
+
+        // Find if we are typing @
+        const lastAt = val.lastIndexOf('@', cursorP - 1);
+        if (lastAt !== -1) {
+            const query = val.slice(lastAt + 1, cursorP).toLowerCase();
+            // No spaces allowed in mention-query for simple detection
+            if (!query.includes(' ')) {
+                this.renderMentionsDropdown(chat, query, lastAt);
+                return;
+            }
+        }
+        this.closeMentionsDropdown();
+    }
+
+    renderMentionsDropdown(chat, filter, atIndex) {
+        let container = document.getElementById('mentions-dropdown-container');
+        if (!container) return;
+
+        const members = Object.values(chat.memberData || {}).filter(m => m.uid !== this.user.uid);
+        const filtered = members.filter(m => m.name.toLowerCase().includes(filter));
+
+        if (filtered.length === 0) {
+            this.closeMentionsDropdown();
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="mentions-dropdown">
+                ${filtered.map(m => `
+                    <div class="mention-item" onclick="app.insertMention('${m.name}', ${atIndex})">
+                        <img src="${m.photo || 'https://i.pravatar.cc/150'}" class="mention-avatar">
+                        <span class="mention-name">${m.name}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    insertMention(name, atIndex) {
+        const input = document.getElementById('msg-input');
+        const val = input.value;
+        const cursorP = input.selectionStart;
+        
+        const before = val.slice(0, atIndex);
+        const after = val.slice(cursorP);
+        
+        input.value = before + '@' + name + ' ' + after;
+        input.focus();
+        this.closeMentionsDropdown();
+    }
+
+    closeMentionsDropdown() {
+        const container = document.getElementById('mentions-dropdown-container');
+        if (container) container.innerHTML = '';
+    }
+
+    handleMentionKeys(e) {
+        if (e.key === 'Escape') this.closeMentionsDropdown();
     }
 
     async getLinkPreview(url) {

@@ -1996,6 +1996,74 @@ body::before {
     border-radius: 12px;
 }
 
+/* 8. Mentions (@Tagging) */
+.mentions-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 200px;
+    background: var(--glass-panel-solid);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.15);
+    overflow-y: auto;
+    margin-bottom: 12px;
+    z-index: 100;
+    animation: slide-up 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slide-up {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.mention-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.mention-item:last-child { border-bottom: none; }
+
+.mention-item:hover {
+    background: var(--glass-hover);
+}
+
+.mention-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.mention-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mention-highlight {
+    color: var(--accent);
+    font-weight: 700;
+    background: rgba(99, 102, 241, 0.1);
+    padding: 0 4px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.msg-bubble.mine .mention-highlight {
+    color: white;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+
 
 
 
