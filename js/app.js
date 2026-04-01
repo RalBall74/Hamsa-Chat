@@ -451,6 +451,7 @@ class HamsterApp {
 
             this.allChats = docs;
             this.renderFilteredChats();
+            this.checkIncomingCalls(docs);
         });
     }
 
@@ -632,6 +633,9 @@ class HamsterApp {
                                 <i data-lucide="image" style="width: 20px;"></i>
                                 <input type="file" accept="image/*" style="display: none;" onchange="app.handleChatImageUpload(event, '${chatId}')">
                             </label>
+                            <button type="button" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; cursor: pointer; display: flex; align-items: center;" onclick="app.toggleStickerPicker('${chatId}')" title="Stickers">
+                                <i data-lucide="sticker" style="width: 20px;"></i>
+                            </button>
                             ` : ''}
                             <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off" oninput="app.handleTyping('${chatId}')">
                             ${!isAI ? `
@@ -639,11 +643,12 @@ class HamsterApp {
                                 <i data-lucide="mic" style="width: 20px;"></i>
                             </button>
                             ` : ''}
-                        </form>
                         <button type="button" onclick="app.handleSendMessage('${chatId}')" style="background: linear-gradient(135deg, var(--accent), var(--accent-light)); color: white; border: none; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(109, 40, 217, 0.35); flex-shrink: 0; transform: ${this.lang === 'ar' ? 'scaleX(-1)' : 'none'};">
                             <i data-lucide="send" style="width: 20px;"></i>
                         </button>
                     </div>
+                </div>
+                <div id="sticker-picker-container" class="hidden" style="position: absolute; bottom: 85px; left: 10px; background: var(--glass-panel-solid); border: 1px solid var(--glass-border); border-radius: 12px; padding: 10px; z-index: 10; width: calc(100% - 20px); max-height: 200px; overflow-y: auto;">
                 </div>
             </div>
         `;
@@ -687,7 +692,7 @@ class HamsterApp {
                     ${!isAI ? `
                     <button class="nav-item" onclick="app.toggleChatSearch()" title="Search in Chat"><i data-lucide="search"></i></button>
                     <button class="nav-item" onclick="app.toggleArchive('${chat.id}')" title="${archiveTitle}"><i data-lucide="${archiveIcon}"></i></button>
-                    ${chat.type !== 'group' ? `<button class="nav-item" onclick="app.startCall('${chatId}')"><i data-lucide="phone"></i></button>` : ''}
+                    ${chat.type !== 'group' && partner.status === 'online' ? `<button class="nav-item call-btn" onclick="app.startCall('${chatId}')"><i data-lucide="phone"></i></button>` : `<button class="nav-item call-btn" onclick="app.startCall('${chatId}')" style="opacity:0.4"><i data-lucide="phone"></i></button>`}
                     <button class="nav-item" onclick="app.renderChatInfo('${chat.id}')"><i data-lucide="more-vertical"></i></button>
                     ` : ''}
                 </div>
@@ -884,6 +889,9 @@ class HamsterApp {
                 if (msg.image) {
                     contentStr = `<img src="${msg.image}" style="width: 100%; height: auto; border-radius: 8px; cursor: pointer; display: block;" onclick="app.viewImage('${msg.image}');">`;
                     extraBubbleClass = 'image-only-bubble';
+                } else if (msg.sticker) {
+                    contentStr = `<img src="${msg.sticker}" style="width: 140px; height: 140px; object-fit: contain; display: block; background: transparent; pointer-events: none;">`;
+                    extraBubbleClass = 'sticker-only-bubble';
                 } else if (msg.audio) {
                     const senderPhoto = isMine ? (this.userData?.photoURL || 'https://ui-avatars.com/api/?name=Me') : (chat.memberData?.[msg.senderId]?.photo || `https://ui-avatars.com/api/?name=${chat.memberData?.[msg.senderId]?.name || 'User'}`);
 
@@ -1933,7 +1941,7 @@ class HamsterApp {
         const msg = this.currentMessages[msgId];
         if (!msg) return;
         const isMine = msg.senderId === this.user.uid;
-        const canEdit = isMine && !msg.image && !msg.audio;
+        const canEdit = isMine && !msg.image && !msg.audio && !msg.sticker;
 
         let buttonsHTML = '';
         buttonsHTML += `<button class="msg-option-btn" onclick="app.prepareReply('${chatId}', '${msgId}')">
@@ -3535,6 +3543,174 @@ class HamsterApp {
             </div>
         `;
         lucide.createIcons();
+    }
+
+    checkIncomingCalls(docs) {
+        if (this.currentCallChatId) return; // Already in a call
+        
+        for (const chat of docs) {
+            if (chat.activeCall && chat.activeCall.status === 'ringing' && chat.activeCall.caller !== this.user.uid) {
+                // Ignore if we already showed ringing for this call
+                if (document.getElementById('incoming-call-overlay')) return;
+                
+                const partner = this.getChatPartner(chat);
+                const overlay = document.createElement('div');
+                overlay.id = 'incoming-call-overlay';
+                overlay.innerHTML = `
+                    <div class="incoming-call-container">
+                        <img src="${partner.photo}" class="incoming-call-avatar">
+                        <h2 style="color:white; margin:10px 0;">${partner.name}</h2>
+                        <p style="color:var(--text-muted); margin-bottom: 30px;">${this.lang === 'ar' ? 'مكالمة واردة...' : 'Incoming Call...'}</p>
+                        <div style="display: flex; gap: 40px;">
+                            <button class="call-action-btn decline" onclick="app.rejectCall('${chat.id}')"><i data-lucide="phone-off"></i></button>
+                            <button class="call-action-btn accept" onclick="app.answerCall('${chat.id}', '${chat.activeCall.id}')"><i data-lucide="phone"></i></button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                lucide.createIcons();
+                // Play ringtone if needed
+                return; // only show one call at a time
+            }
+        }
+    }
+
+    async rejectCall(chatId) {
+        document.getElementById('incoming-call-overlay')?.remove();
+        await updateDoc(doc(db, 'chats', chatId), {
+            activeCall: { status: 'ended' }
+        });
+    }
+
+    async answerCall(chatId, callId) {
+        document.getElementById('incoming-call-overlay')?.remove();
+        await updateDoc(doc(db, 'chats', chatId), {
+            'activeCall.status': 'connected'
+        });
+        this.openCallWindow(chatId, callId, false);
+    }
+
+    async startCall(chatId) {
+        const chat = this.allChats.find(c => c.id === chatId);
+        if (!chat || chat.type === 'group') return;
+
+        const partner = this.getChatPartner(chat);
+        if (partner.status !== 'online') {
+            this.showAlert(this.lang === 'ar' ? "المستخدم غير متصل" : "User Offline", this.lang === 'ar' ? "لا يمكن الاتصال بمستخدم غير متصل." : "Cannot call an offline user.");
+            return;
+        }
+
+        const callId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
+        try {
+            await updateDoc(doc(db, 'chats', chatId), {
+                activeCall: { id: callId, caller: this.user.uid, status: 'ringing' }
+            });
+            this.openCallWindow(chatId, callId, true);
+        } catch (e) {
+            console.error(e);
+            this.showAlert("Error", "Call failed to connect.");
+        }
+    }
+
+    openCallWindow(chatId, callId, isCaller) {
+        this.currentCallChatId = chatId;
+        const partner = this.getChatPartner(this.allChats.find(c => c.id === chatId));
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'call-overlay';
+        overlay.innerHTML = `
+            <div class="call-container" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg-card); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div style="width: 150px; height: 150px; border-radius: 50%; opacity: 0.8; box-shadow: 0 0 50px var(--accent); background-image: url('${partner.photo}'); background-size: cover; background-position: center; border: 4px solid var(--accent); animation: pulse 2s infinite;"></div>
+                <h2 style="color: var(--text-primary); margin-top: 30px; font-size: 28px;">${partner.name}</h2>
+                <p style="color: var(--text-secondary); margin-bottom: 50px; font-weight: 500;" id="call-status-text">${isCaller ? 'Calling...' : 'Connecting...'}</p>
+                <audio id="remote-audio" autoplay></audio>
+                
+                <div class="call-actions" style="display: flex; gap: 20px;">
+                    <button class="call-action-btn end-call" style="background:#ef4444; color:white; border:none; width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer;" onclick="app.endCall()"><i data-lucide="phone-off"></i></button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        lucide.createIcons();
+        
+        this.setupWebRTC(chatId, callId, isCaller).catch(e => {
+            console.error("WebRTC Setup Failed", e);
+            this.endCall();
+        });
+    }
+
+    async setupWebRTC(chatId, callId, isCaller) {
+        const callStatus = document.getElementById('call-status-text');
+        
+        let audioStream;
+        try {
+            audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            this.showAlert("Microphone Error", "Cannot access microphone.");
+            this.endCall();
+            return;
+        }
+        
+        this.localCallStream = audioStream;
+        
+        if (isCaller) {
+            let dots = 0;
+            this.callInterval = setInterval(() => {
+                dots = (dots + 1) % 4;
+                if(callStatus) callStatus.innerText = 'Ringing' + '.'.repeat(dots);
+            }, 500);
+        } else {
+            if(callStatus) callStatus.innerText = 'Connected 00:00';
+            this.startCallTimer();
+        }
+        
+        if(this.callUnsubscribe) this.callUnsubscribe();
+        this.callUnsubscribe = onSnapshot(doc(db, 'chats', chatId), (snap) => {
+            const data = snap.data();
+            if(!data || !data.activeCall || data.activeCall.status === 'ended' || data.activeCall.id !== callId) {
+                this.endCall(true);
+            } else if (data.activeCall.status === 'connected' && isCaller) {
+                clearInterval(this.callInterval);
+                if(callStatus) callStatus.innerText = 'Connected 00:00';
+                this.startCallTimer();
+            }
+        });
+    }
+    
+    startCallTimer() {
+        if (this.callTimer) clearInterval(this.callTimer);
+        let sec = 0;
+        this.callTimer = setInterval(() => {
+            sec++;
+            const m = String(Math.floor(sec/60)).padStart(2, '0');
+            const s = String(sec%60).padStart(2, '0');
+            const statusText = document.getElementById('call-status-text');
+            if(statusText) statusText.innerText = `Connected ${m}:${s}`;
+        }, 1000);
+    }
+
+    async endCall(isRemote = false) {
+        if(this.localCallStream) {
+            this.localCallStream.getTracks().forEach(t => t.stop());
+            this.localCallStream = null;
+        }
+        if(this.callInterval) clearInterval(this.callInterval);
+        if(this.callTimer) clearInterval(this.callTimer);
+        if(this.callUnsubscribe) this.callUnsubscribe();
+        
+        document.getElementById('call-overlay')?.remove();
+        document.getElementById('incoming-call-overlay')?.remove();
+        
+        if(!isRemote && this.currentCallChatId) {
+            try {
+                await updateDoc(doc(db, 'chats', this.currentCallChatId), {
+                    activeCall: { status: 'ended' }
+                });
+            } catch (e) {}
+        }
+        
+        this.currentCallChatId = null;
     }
 
     formatLastSeen(timestamp) {
