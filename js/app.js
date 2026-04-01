@@ -635,6 +635,9 @@ class HamsterApp {
                             ` : ''}
                             <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off" oninput="app.handleTyping('${chatId}')">
                             ${!isAI ? `
+                            <button type="button" onclick="app.toggleGifPicker('${chatId}')" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;">
+                                <i data-lucide="sticker" style="width: 20px;"></i>
+                            </button>
                             <button type="button" id="voice-btn" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;" onmousedown="app.startRecording()" onmouseup="app.stopRecording()" ontouchstart="app.startRecording()" ontouchend="app.stopRecording()">
                                 <i data-lucide="mic" style="width: 20px;"></i>
                             </button>
@@ -644,6 +647,7 @@ class HamsterApp {
                             <i data-lucide="send" style="width: 20px;"></i>
                         </button>
                     </div>
+                    <div id="gif-picker-container" class="hidden"></div>
                 </div>
             </div>
         `;
@@ -818,7 +822,10 @@ class HamsterApp {
 
                 let contentStr = '';
                 let extraBubbleClass = '';
-                if (msg.image) {
+                if (msg.gif) {
+                    contentStr = `<img src="${msg.gif}" style="max-width: 100%; border-radius: 12px; display: block; background: rgba(0,0,0,0.05);">`;
+                    extraBubbleClass = 'gif-bubble';
+                } else if (msg.image) {
                     contentStr = `<img src="${msg.image}" style="width: 100%; height: auto; border-radius: 8px; cursor: pointer; display: block;" onclick="app.viewImage('${msg.image}');">`;
                     extraBubbleClass = 'image-only-bubble';
                 } else if (msg.audio) {
@@ -1323,6 +1330,73 @@ class HamsterApp {
             console.warn("Link preview failed", e);
         }
         return null;
+    }
+
+    async toggleGifPicker(chatId) {
+        const picker = document.getElementById('gif-picker-container');
+        if (!picker.classList.contains('hidden')) {
+            picker.classList.add('hidden');
+            return;
+        }
+
+        picker.classList.remove('hidden');
+        picker.innerHTML = `
+            <div class="gif-picker-inner">
+                <div class="gif-search-bar">
+                    <input type="text" placeholder="${this.lang === 'ar' ? 'بحث عن GIFs...' : 'Search GIFs...'}" id="gif-search-input" oninput="app.searchGifs(this.value, '${chatId}')">
+                    <i data-lucide="search" style="width: 16px;"></i>
+                </div>
+                <div id="gif-results" class="gif-grid scrollbar-hidden">
+                    <div style="text-align: center; padding: 20px; color: var(--text-muted);">${this.lang === 'ar' ? 'جاري التحميل...' : 'Loading...'}</div>
+                </div>
+            </div>
+        `;
+        lucide.createIcons({ node: picker });
+        this.searchGifs('', chatId); // Trending by default
+    }
+
+    async searchGifs(query, chatId) {
+        const resultsEl = document.getElementById('gif-results');
+        const apiKey = 'dc6zaTOxFJmzC'; // Public Beta Key
+        const endpoint = query 
+            ? `https://api.giphy.com/v1/gifs/search?api_key=${apiKey}&q=${encodeURIComponent(query)}&limit=20` 
+            : `https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=20`;
+
+        try {
+            const res = await fetch(endpoint);
+            const data = await res.json();
+            if (!data.data) return;
+
+            resultsEl.innerHTML = data.data.map(gif => `
+                <img src="${gif.images.fixed_height_small.url}" class="gif-item" onclick="app.sendGif('${chatId}', '${gif.images.fixed_height.url}')">
+            `).join('');
+        } catch (e) {
+            console.error(e);
+            resultsEl.innerHTML = '<div style="padding: 20px; color: #ef4444;">Failed to load.</div>';
+        }
+    }
+
+    async sendGif(chatId, url) {
+        document.getElementById('gif-picker-container').classList.add('hidden');
+        try {
+            const batch = writeBatch(db);
+            const msgRef = doc(collection(db, `chats/${chatId}/messages`));
+            const text = this.lang === 'ar' ? '🎬 GIF' : '🎬 GIF';
+
+            const payload = {
+                chatId, gif: url, senderId: this.user.uid, createdAt: serverTimestamp(), status: 'sent'
+            };
+            
+            batch.set(msgRef, payload);
+            batch.set(doc(db, 'chats', chatId), {
+                lastMessage: { text, senderId: this.user.uid, msgId: msgRef.id },
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+
+            await batch.commit();
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     renderChatInfo(chatId) {
