@@ -859,7 +859,7 @@ class HamsterApp {
                     `;
                     extraBubbleClass = 'wa-audio-bubble';
                 } else {
-                    contentStr = this.linkify(msg.text || '');
+                    contentStr = this.formatMessageContent(msg);
                     if (msg.edited) {
                         contentStr += ` <span style="font-size: 10px; opacity: 0.7; font-style: italic;">(${this.lang === 'ar' ? 'معدلة' : 'edited'})</span>`;
                     }
@@ -1273,6 +1273,30 @@ class HamsterApp {
         }
 
         return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from Hamster AI. Check console for details.';
+    }
+
+    formatMessageContent(msg) {
+        if (!msg.text) return '';
+        const text = msg.text;
+        
+        if (msg.senderId === 'hamster_ai_bot') {
+            return this.markdownToHTML(text);
+        }
+        
+        return this.linkify(text);
+    }
+
+    markdownToHTML(text) {
+        let html = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+            .replace(/\n\s*\*\s(.*?)/g, '<br>• $1') // Lists
+            .replace(/`(.*?)`/g, '<code style="background: rgba(0,0,0,0.1); padding: 2px 4px; border-radius: 4px; font-family: monospace;">$1</code>') // Inline Code
+            .replace(/\n/g, '<br>');
+        
+        return this.linkify(html);
     }
 
     linkify(text) {
