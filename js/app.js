@@ -54,13 +54,14 @@ class HamsterApp {
     init() {
         this.loadLang();
         this.loadTheme();
+        this.loadWallpaper();
+        this.loadLock();
         this.setupAuth();
         this.setupNav();
         this.setupSearch();
         this.handleNavigation('chats');
         lucide.createIcons();
         this.registerSW();
-        this.loadWallpaper();
     }
 
     registerSW() {
@@ -208,6 +209,10 @@ class HamsterApp {
                     await this.syncUser(user);
                     this.updateGlobalUserUI(); // Final update with DB data
                     
+                    // Update localStorage with synced data
+                    if (this.userData?.appLockPin) localStorage.setItem('hamster-lock-pin', this.userData.appLockPin);
+                    if (this.userData?.wallpaper) localStorage.setItem('hamster-wallpaper', this.userData.wallpaper);
+
                     if (this.userData?.appLockPin && !this.isUnlockedSession) {
                         this.showLockScreen();
                     }
@@ -253,7 +258,8 @@ class HamsterApp {
         let existingData = {};
         if (snap.exists()) {
             existingData = snap.data();
-            this.userData = existingData;
+            // Merge with existing local data to avoid losing localStorage values before sync
+            this.userData = { ...this.userData, ...existingData };
         }
 
         // Only generate/validate username if the user doesn't already have one
@@ -2904,6 +2910,7 @@ class HamsterApp {
                 async () => {
                     await updateDoc(doc(db, 'users', this.user.uid), { appLockPin: null });
                     this.userData.appLockPin = null;
+                    localStorage.removeItem('hamster-lock-pin');
                     this.renderSettingsPage();
                 }
             );
@@ -2916,6 +2923,7 @@ class HamsterApp {
                     if (pin && /^\d{4}$/.test(pin)) {
                         await updateDoc(doc(db, 'users', this.user.uid), { appLockPin: pin });
                         this.userData.appLockPin = pin;
+                        localStorage.setItem('hamster-lock-pin', pin);
                         this.renderSettingsPage();
                     } else {
                         this.showAlert(this.lang === 'ar' ? 'خطأ' : 'Invalid PIN', this.lang === 'ar' ? 'يجب أن يكون الرمز 4 أرقام فقط.' : 'PIN must be exactly 4 digits.');
@@ -2931,6 +2939,14 @@ class HamsterApp {
         if (saved) {
             if (!this.userData) this.userData = {};
             this.userData.wallpaper = saved;
+        }
+    }
+
+    loadLock() {
+        const saved = localStorage.getItem('hamster-lock-pin');
+        if (saved) {
+            if (!this.userData) this.userData = {};
+            this.userData.appLockPin = saved;
         }
     }
 
