@@ -370,9 +370,8 @@ body::before {
 
 .msg-bubble {
     display: flex;
-    max-width: 75%;
+    max-width: 70%;
     margin-bottom: 2px;
-    width: fit-content;
 }
 
 .msg-bubble.mine {
@@ -384,16 +383,13 @@ body::before {
 }
 
 .bubble-content {
-    padding: 10px 14px;
-    font-size: 14px;
-    line-height: 1.5;
-    border-radius: 16px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    border-radius: 14px;
     box-shadow: var(--shadow-sm);
     word-break: break-word;
     overflow-wrap: break-word;
-    white-space: pre-wrap;
-    position: relative;
-    max-width: 100%;
 }
 
 .bubble-content.image-only-bubble {
