@@ -1854,6 +1854,114 @@ body::before {
     }
 }
 
+/* 6. Typing Indicator */
+.typing-indicator {
+    color: var(--online);
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.typing-dots {
+    display: flex;
+    gap: 2px;
+}
+
+.typing-dot {
+    width: 3.5px;
+    height: 3.5px;
+    background: var(--online);
+    border-radius: 50%;
+    animation: typing-bounce 1s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing-bounce {
+    0%, 100% { transform: translateY(0); opacity: 0.4; }
+    50% { transform: translateY(-3.5px); opacity: 1; }
+}
+
+/* 7. Link Preview Box */
+.link-preview-box {
+    background: var(--glass-panel);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 280px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s;
+    box-shadow: var(--shadow-sm);
+}
+
+.link-preview-box:hover {
+    transform: translateY(-2px);
+    background: var(--glass-hover);
+}
+
+.link-preview-img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    background: rgba(0,0,0,0.05);
+}
+
+.link-preview-content {
+    padding: 10px 12px;
+}
+
+.link-preview-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.link-preview-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.link-preview-url {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: lowercase;
+}
+
+/* Extra Tweaks */
+.chat-info-sub {
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.chat-info-sub.hidden {
+    opacity: 0;
+    transform: translateY(5px);
+    pointer-events: none;
+    display: block !important; /* Overriding common utility to keep height */
+}
+
+
 /* 4. Pagination / Load More */
 .load-more-btn {
     width: fit-content;
@@ -1888,4 +1996,4 @@ body::before {
 
 
 
-
+

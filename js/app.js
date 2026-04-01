@@ -20,6 +20,7 @@ class HamsterApp {
         this.lang = 'en';
         this.messageLimit = 50; // Pagination
         this.isSearching = false;
+        this.typingTimeout = null;
         this.strings = {
             en: {
                 chats: "Chats", messages: "Messages", stories: "Stories", archive: "Archived", settings: "Preferences",
@@ -468,7 +469,11 @@ class HamsterApp {
         let html = displayChats.map(chat => {
             const partner = this.getChatPartner(chat);
             const active = chat.id === this.activeChatId ? 'active' : '';
-            const lastMsg = chat.lastMessage?.text || "Started conversation";
+            
+            // Typing Logic
+            const typingUsers = Object.keys(chat.typing || {}).filter(uid => uid !== this.user.uid && chat.typing[uid] === true);
+            const isTyping = typingUsers.length > 0;
+            const lastMsg = isTyping ? (this.lang === 'ar' ? 'يكتب الآن...' : 'Typing...') : (chat.lastMessage?.text || "Started conversation");
 
             return `
                 <div class="chat-card ${active}" onclick="app.selectChat('${chat.id}')">
@@ -477,7 +482,7 @@ class HamsterApp {
                         <div class="card-top">
                             <h4>${partner.name}</h4>
                         </div>
-                        <p>${lastMsg}</p>
+                        <p class="${isTyping ? 'typing-indicator' : ''}">${lastMsg}</p>
                     </div>
                 </div>
             `;
@@ -606,7 +611,7 @@ class HamsterApp {
                                 <i data-lucide="image" style="width: 20px;"></i>
                                 <input type="file" accept="image/*" style="display: none;" onchange="app.handleChatImageUpload(event, '${chatId}')">
                             </label>
-                            <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off">
+                            <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off" oninput="app.handleTyping('${chatId}')">
                             <button type="button" id="voice-btn" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;" onmousedown="app.startRecording()" onmouseup="app.stopRecording()" ontouchstart="app.startRecording()" ontouchend="app.stopRecording()">
                                 <i data-lucide="mic" style="width: 20px;"></i>
                             </button>
@@ -631,6 +636,10 @@ class HamsterApp {
             `;
         }
 
+        const typingUsers = Object.keys(chat.typing || {}).filter(uid => uid !== this.user.uid && chat.typing[uid] === true);
+        const isTyping = typingUsers.length > 0;
+        const statusText = isTyping ? (this.lang === 'ar' ? 'يكتب الآن...' : 'Typing...') : (chat.type === 'group' ? 'Group Space' : (partner.status === 'online' ? (this.lang === 'ar' ? 'متصل الآن' : 'Online') : ''));
+
         chatWindow.innerHTML = `
             <header class="chat-header">
                 <div style="display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; cursor: pointer;" onclick="app.renderChatInfo('${chatId}')">
@@ -638,7 +647,16 @@ class HamsterApp {
                     <img src="${partner.photo}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-left: 4px;">
                     <div style="display: flex; flex-direction: column; justify-content: center; min-width: 0; margin-left: 8px;">
                         <h3 style="font-size: 15px; font-weight: 600; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${partner.name}</h3>
-                        <span id="chat-status" style="font-size: 12px; color: var(--online); font-weight: 500; line-height: 1.2; margin-top: 1px; white-space: nowrap;">${chat.type === 'group' ? 'Group Space' : ''}</span>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span id="chat-status" style="font-size: 11px; color: ${isTyping ? 'var(--online)' : 'var(--text-secondary)'}; font-weight: 500; line-height: 1.2; margin-top: 1px; white-space: nowrap;">${statusText}</span>
+                            ${isTyping ? `
+                            <div class="typing-dots">
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                                <span class="typing-dot"></span>
+                            </div>
+                            ` : ''}
+                        </div>
                     </div>
                 </div>
                 <div style="display: flex; gap: 2px; flex-shrink: 0;">
@@ -815,9 +833,23 @@ class HamsterApp {
                     `;
                     extraBubbleClass = 'wa-audio-bubble';
                 } else {
-                    contentStr = msg.text;
+                    contentStr = this.linkify(msg.text || '');
                     if (msg.edited) {
                         contentStr += ` <span style="font-size: 10px; opacity: 0.7; font-style: italic;">(${this.lang === 'ar' ? 'معدلة' : 'edited'})</span>`;
+                    }
+                    
+                    if (msg.linkPreview) {
+                        const lp = msg.linkPreview;
+                        contentStr += `
+                            <a href="${lp.url}" target="_blank" class="link-preview-box" onclick="event.stopPropagation();">
+                                ${lp.image ? `<img src="${lp.image}" class="link-preview-img">` : ''}
+                                <div class="link-preview-content">
+                                    <div class="link-preview-title">${lp.title || 'Link'}</div>
+                                    ${lp.description ? `<div class="link-preview-desc">${lp.description}</div>` : ''}
+                                    <div class="link-preview-url">${new URL(lp.url).hostname}</div>
+                                </div>
+                            </a>
+                        `;
                     }
                 }
 
@@ -1010,10 +1042,19 @@ class HamsterApp {
             const batch = writeBatch(db);
             const msgRef = doc(collection(db, `chats/${chatId}/messages`));
 
+            // Link Detection
+            const urlMatch = text.match(/(https?:\/\/[^\s]+)/g);
+            let linkPreview = null;
+            if (urlMatch) {
+                linkPreview = await this.getLinkPreview(urlMatch[0]);
+            }
+
             const payload = {
                 chatId, text, senderId: this.user.uid, createdAt: serverTimestamp(), status: 'sent'
             };
             
+            if (linkPreview) payload.linkPreview = linkPreview;
+
             if (this.replyToMsgId) {
                 payload.replyTo = this.replyToMsgId;
             }
@@ -1033,6 +1074,49 @@ class HamsterApp {
     }
 
     // --- Interaction Features ---
+
+    async handleTyping(chatId) {
+        if (this.typingTimeout) clearTimeout(this.typingTimeout);
+        
+        // Update Firestore to typing: true
+        const chatRef = doc(db, 'chats', chatId);
+        const updateObj = {};
+        updateObj[`typing.${this.user.uid}`] = true;
+        await updateDoc(chatRef, updateObj);
+
+        this.typingTimeout = setTimeout(async () => {
+            const stopObj = {};
+            stopObj[`typing.${this.user.uid}`] = false;
+            await updateDoc(chatRef, stopObj);
+        }, 2000);
+    }
+
+    linkify(text) {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        return text.replace(urlRegex, (url) => {
+            return `<a href="${url}" target="_blank" style="color: inherit; text-decoration: underline;">${url}</a>`;
+        });
+    }
+
+    async getLinkPreview(url) {
+        try {
+            // Using Microlink (free tier)
+            const response = await fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`);
+            const json = await response.json();
+            if (json.status === 'success' && json.data) {
+                const d = json.data;
+                return {
+                    url,
+                    title: d.title,
+                    image: d.image?.url,
+                    description: d.description
+                };
+            }
+        } catch (e) {
+            console.warn("Link preview failed", e);
+        }
+        return null;
+    }
 
     renderChatInfo(chatId) {
         const chat = this.allChats.find(c => c.id === chatId);
