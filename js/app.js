@@ -59,7 +59,7 @@ class HamsterApp {
         this.loadTheme();
         this.loadWallpaper();
         this.loadLock();
-        
+
         // Show Lock Screen immediately if PIN exists in localStorage
         if (this.userData?.appLockPin) {
             this.showLockScreen();
@@ -217,7 +217,7 @@ class HamsterApp {
                 try {
                     await this.syncUser(user);
                     this.updateGlobalUserUI(); // Final update with DB data
-                    
+
                     // Update localStorage with synced data
                     if (this.userData?.appLockPin) localStorage.setItem('hamster-lock-pin', this.userData.appLockPin);
                     if (this.userData?.wallpaper) localStorage.setItem('hamster-wallpaper', this.userData.wallpaper);
@@ -226,7 +226,7 @@ class HamsterApp {
                     if (this.userData?.appLockPin && !this.isUnlockedSession && !this.isLocked) {
                         this.showLockScreen();
                     }
-                    
+
                     console.log("Hamster: Session Synced", user.email);
                 } catch (e) {
                     console.error("Hamster: Sync failed (working offline?)", e);
@@ -237,7 +237,7 @@ class HamsterApp {
                 // Hide Lock Screen if shown from localStorage but no user session exists
                 document.getElementById('app-lock-overlay').classList.add('hidden');
                 this.isLocked = false;
-                
+
                 // Show Login
                 document.getElementById('hamster-app').classList.add('hidden');
                 document.getElementById('auth-overlay').classList.remove('hidden');
@@ -432,7 +432,7 @@ class HamsterApp {
 
         onSnapshot(q, (snapshot) => {
             let docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
+
             // Inject Hamster AI
             const aiId = this.user.uid + '_ai';
             if (!docs.find(c => c.id === aiId)) {
@@ -487,7 +487,7 @@ class HamsterApp {
         let html = displayChats.map(chat => {
             const partner = this.getChatPartner(chat);
             const active = chat.id === this.activeChatId ? 'active' : '';
-            
+
             // Typing Logic
             const typingUsers = Object.keys(chat.typing || {}).filter(uid => uid !== this.user.uid && chat.typing[uid] === true);
             const isTyping = typingUsers.length > 0;
@@ -711,7 +711,7 @@ class HamsterApp {
                     if (data && data.lastSeen && statusEl) {
                         const secondsSince = (Date.now() - data.lastSeen.toMillis()) / 1000;
                         const isOnline = secondsSince < 120; // 2 minutes
-                        
+
                         if (isOnline) {
                             statusEl.innerText = this.lang === 'ar' ? 'متصل الآن' : 'Online';
                         } else if (showLastSeen) {
@@ -759,7 +759,7 @@ class HamsterApp {
 
     listenForMessages(chatId) {
         if (this.messagesUnsubscribe) this.messagesUnsubscribe();
-        
+
         // Reset limit on new chat
         if (this.lastActiveChatId !== chatId) {
             this.messageLimit = 50;
@@ -767,8 +767,8 @@ class HamsterApp {
         }
 
         const q = query(
-            collection(db, `chats/${chatId}/messages`), 
-            orderBy('createdAt', 'desc'), 
+            collection(db, `chats/${chatId}/messages`),
+            orderBy('createdAt', 'desc'),
             limit(this.messageLimit)
         );
 
@@ -784,7 +784,7 @@ class HamsterApp {
             const now = Date.now();
 
             let messagesHTML = '';
-            
+
             // Add Load More button if we might have more messages
             if (snapshot.docs.length >= this.messageLimit) {
                 messagesHTML += `<button class="load-more-btn" onclick="app.loadMoreMessages('${chatId}')">${this.lang === 'ar' ? 'تحميل الرسائل القديمة' : 'Load previous messages'}</button>`;
@@ -793,7 +793,7 @@ class HamsterApp {
             messagesHTML += docs.map(docSnap => {
                 const msgId = docSnap.id;
                 const msg = docSnap.data();
-                
+
                 this.currentMessages[msgId] = msg;
                 const isMine = msg.senderId === this.user.uid;
 
@@ -855,7 +855,7 @@ class HamsterApp {
                     if (msg.edited) {
                         contentStr += ` <span style="font-size: 10px; opacity: 0.7; font-style: italic;">(${this.lang === 'ar' ? 'معدلة' : 'edited'})</span>`;
                     }
-                    
+
                     if (msg.linkPreview) {
                         const lp = msg.linkPreview;
                         contentStr += `
@@ -933,10 +933,10 @@ class HamsterApp {
                     </div>
                 `;
             }).join('');
-            
+
             const prevScroll = container.scrollHeight - container.scrollTop;
             container.innerHTML = messagesHTML;
-            
+
             // Maintain scroll position if loading more, else scroll to bottom
             if (this.isLoadingMore) {
                 container.scrollTop = container.scrollHeight - prevScroll;
@@ -944,7 +944,7 @@ class HamsterApp {
             } else {
                 container.scrollTop = container.scrollHeight;
             }
-            
+
             lucide.createIcons();
         });
     }
@@ -1025,7 +1025,7 @@ class HamsterApp {
             const payload = {
                 chatId, image: imageData, senderId: this.user.uid, createdAt: serverTimestamp(), status: 'sent'
             };
-            
+
             if (this.replyToMsgId) {
                 payload.replyTo = this.replyToMsgId;
             }
@@ -1053,7 +1053,11 @@ class HamsterApp {
 
         const input = document.getElementById('msg-input');
         const text = input.value.trim();
-        if (!text) return;
+        if (!text && !this.replyToMsgId) return;
+
+        if (chatId === this.user.uid + '_ai') {
+            return this.handleAIMessage(chatId, text);
+        }
 
         input.value = '';
         try {
@@ -1070,7 +1074,7 @@ class HamsterApp {
             const payload = {
                 chatId, text, senderId: this.user.uid, createdAt: serverTimestamp(), status: 'sent'
             };
-            
+
             if (linkPreview) payload.linkPreview = linkPreview;
 
             if (this.replyToMsgId) {
@@ -1095,7 +1099,7 @@ class HamsterApp {
 
     async handleTyping(chatId) {
         if (this.typingTimeout) clearTimeout(this.typingTimeout);
-        
+
         // Mention Logic
         this.handleMentionSuggestions(chatId);
 
@@ -1115,7 +1119,7 @@ class HamsterApp {
     handleMentionSuggestions(chatId) {
         const chat = this.allChats.find(c => c.id === chatId);
         if (!chat || chat.type !== 'group') return;
-        
+
         const input = document.getElementById('msg-input');
         if (!input) return;
 
@@ -1172,14 +1176,14 @@ class HamsterApp {
         // Rate limit check
         const now = Date.now();
         let aiUsage = JSON.parse(localStorage.getItem('hamster_ai_usage') || '{"count": 0, "firstMsgTime": 0}');
-        
+
         if (now - aiUsage.firstMsgTime > 5 * 60 * 1000) {
             aiUsage = { count: 0, firstMsgTime: now };
         }
-        
+
         if (aiUsage.count >= 5) {
             this.showAlert(
-                this.lang === 'ar' ? 'الرجاء الانتظار' : 'Please wait', 
+                this.lang === 'ar' ? 'الرجاء الانتظار' : 'Please wait',
                 this.lang === 'ar' ? 'لقد وصلت للحد المسموح (5 رسائل كل 5 دقائق). يرجى الانتظار لتوفير الموارد.' : 'You have reached the limit (5 messages per 5 minutes). Please wait to save resources.'
             );
             return;
@@ -1198,9 +1202,9 @@ class HamsterApp {
 
         // Show AI Typing
         const chatRef = doc(db, 'chats', chatId);
-        await setDoc(chatRef, { 
+        await setDoc(chatRef, {
             memberIds: [this.user.uid, 'hamster_ai_bot'],
-            typing: { 'hamster_ai_bot': true } 
+            typing: { 'hamster_ai_bot': true }
         }, { merge: true });
 
         try {
@@ -1225,7 +1229,7 @@ class HamsterApp {
         const p4 = 'euqvofIb';
         const p5 = 'PiEABcc';
         const apiKey = [p1, p2, p3, p4, p5].join('');
-        
+
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2494,7 +2498,7 @@ class HamsterApp {
 
         const isMine = story.uid === this.user.uid;
         const timeStr = story.createdAt ? new Date(story.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-        
+
         let contentHTML = '';
         if (story.type === 'text') {
             contentHTML = `
@@ -2561,7 +2565,7 @@ class HamsterApp {
     async submitTextStory(text) {
         const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#06b6d4'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        
+
         await addDoc(collection(db, 'stories'), {
             uid: this.user.uid,
             name: this.userData.displayName,
@@ -2571,7 +2575,7 @@ class HamsterApp {
             bg: randomColor,
             createdAt: serverTimestamp()
         });
-        
+
         this.showAlert(this.lang === 'ar' ? 'تم النشر' : 'Moment Captured', this.lang === 'ar' ? 'تم نشر القصة بنجاح!' : 'Story shared successfully!');
     }
 
@@ -3184,7 +3188,7 @@ class HamsterApp {
             this.currentPinInput += digit;
             this.updatePinDots();
             if (navigator.vibrate) navigator.vibrate(10);
-            
+
             if (this.currentPinInput.length === 4) {
                 setTimeout(() => this.verifyPin(), 200);
             }
@@ -3279,12 +3283,12 @@ class HamsterApp {
         this.userData.wallpaper = url;
         localStorage.setItem('hamster-wallpaper', url);
         await updateDoc(doc(db, 'users', this.user.uid), { wallpaper: url });
-        
+
         const area = document.getElementById('messages-area');
         if (area) {
             area.style.backgroundImage = url ? `url(${url})` : 'none';
         }
-        
+
         this.renderSettingsPage();
     }
 
@@ -3298,7 +3302,7 @@ class HamsterApp {
             img.onload = async () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                
+
                 // Max resolution for wallpaper
                 const maxWidth = 1280;
                 let w = img.width;
@@ -3307,7 +3311,7 @@ class HamsterApp {
                     h = (maxWidth / w) * h;
                     w = maxWidth;
                 }
-                
+
                 canvas.width = w;
                 canvas.height = h;
                 ctx.drawImage(img, 0, 0, w, h);
@@ -3419,8 +3423,8 @@ class HamsterApp {
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 
         // Zero out the hours for day comparison
-        const dDate = new Date(date).setHours(0,0,0,0);
-        const dNow = new Date(now).setHours(0,0,0,0);
+        const dDate = new Date(date).setHours(0, 0, 0, 0);
+        const dNow = new Date(now).setHours(0, 0, 0, 0);
         const dDiff = Math.floor((dNow - dDate) / oneDay);
 
         if (dDiff === 0) {
