@@ -19,9 +19,7 @@ class HamsterApp {
         this.deferredPrompt = null;
         this.lang = 'en';
         this.messageLimit = 50; // Pagination
-        this.currentTimer = 0; // Self-destruct timer (seconds)
         this.isSearching = false;
-        this.privacyShieldActive = false;
         this.strings = {
             en: {
                 chats: "Chats", messages: "Messages", stories: "Stories", archive: "Archived", settings: "Preferences",
@@ -245,34 +243,6 @@ class HamsterApp {
                 if (window.lucide) lucide.createIcons({ node: document.getElementById('auth-overlay') });
             }
         });
-
-        // Privacy Shield Listener
-        document.addEventListener('visibilitychange', () => {
-            const isSecure = this.userData?.privacy?.secureMode;
-            if (isSecure && document.visibilityState === 'hidden') {
-                this.showPrivacyShield();
-            } else if (document.visibilityState === 'visible') {
-                this.hidePrivacyShield();
-            }
-        });
-    }
-
-    showPrivacyShield() {
-        if (document.getElementById('privacy-shield-overlay')) return;
-        const shield = document.createElement('div');
-        shield.id = 'privacy-shield-overlay';
-        shield.className = 'privacy-shield';
-        shield.innerHTML = `
-            <i data-lucide="shield-alert" style="width: 48px; height: 48px; margin-bottom: 16px;"></i>
-            <h2 style="font-size: 20px; font-weight: 700;">Privacy Mode Active</h2>
-            <p style="font-size: 14px; opacity: 0.7;">Content is hidden for your security.</p>
-        `;
-        document.body.appendChild(shield);
-        lucide.createIcons({ node: shield });
-    }
-
-    hidePrivacyShield() {
-        document.getElementById('privacy-shield-overlay')?.remove();
     }
 
     // Returns a guaranteed-unique username for the given base string and uid
@@ -625,12 +595,6 @@ class HamsterApp {
 
         const blockedBy = chat.blockedBy || [];
         const amIBlocked = blockedBy.length > 0;
-        const isSecure = this.userData?.privacy?.secureMode;
-        
-        // Timer Button HTML
-        const timerIcon = this.currentTimer > 0 ? 'clock' : 'clock';
-        const timerLabel = this.currentTimer > 0 ? (this.currentTimer < 60 ? `${this.currentTimer}s` : `${this.currentTimer/60}m`) : '';
-        const timerActive = this.currentTimer > 0 ? 'active' : '';
 
         let inputAreaHTML = `
             <div class="input-area">
@@ -643,10 +607,6 @@ class HamsterApp {
                                 <input type="file" accept="image/*" style="display: none;" onchange="app.handleChatImageUpload(event, '${chatId}')">
                             </label>
                             <input type="text" id="msg-input" placeholder="${this.t('msg_placeholder')}" autocomplete="off">
-                            <button type="button" class="timer-btn ${timerActive}" onclick="app.cycleMessageTimer()" title="Self-destruct Timer">
-                                <i data-lucide="history" style="width: 18px;"></i>
-                                <span>${timerLabel}</span>
-                            </button>
                             <button type="button" id="voice-btn" style="background: none; border: none; color: var(--text-secondary); flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; cursor: pointer;" onmousedown="app.startRecording()" onmouseup="app.stopRecording()" ontouchstart="app.startRecording()" ontouchend="app.stopRecording()">
                                 <i data-lucide="mic" style="width: 20px;"></i>
                             </button>
@@ -696,7 +656,7 @@ class HamsterApp {
                 </div>
             </div>
             
-            <div id="messages-area" class="messages-area ${isSecure ? 'secure-mode' : ''}" style="${this.userData?.wallpaper ? `background-image: url(${this.userData.wallpaper});` : ''}"></div>
+            <div id="messages-area" class="messages-area" style="${this.userData?.wallpaper ? `background-image: url(${this.userData.wallpaper});` : ''}"></div>
             ${inputAreaHTML}
         `;
         lucide.createIcons();
@@ -798,15 +758,6 @@ class HamsterApp {
                 const msgId = docSnap.id;
                 const msg = docSnap.data();
                 
-                // --- Self-Destruct Cleanup ---
-                if (msg.expiresAt && msg.expiresAt.toMillis) {
-                    const expiry = msg.expiresAt.toMillis();
-                    if (now > expiry) {
-                        deleteDoc(doc(db, `chats/${chatId}/messages`, msgId));
-                        return ''; // Skip this message
-                    }
-                }
-
                 this.currentMessages[msgId] = msg;
                 const isMine = msg.senderId === this.user.uid;
 
@@ -954,19 +905,6 @@ class HamsterApp {
         this.listenForMessages(chatId);
     }
 
-    cycleMessageTimer() {
-        const steps = [0, 5, 30, 60, 3600]; // Off, 5s, 30s, 1m, 1h
-        const idx = steps.indexOf(this.currentTimer);
-        this.currentTimer = steps[(idx + 1) % steps.length];
-        
-        // Update UI
-        const btn = document.querySelector('.timer-btn');
-        const span = btn.querySelector('span');
-        btn.classList.toggle('active', this.currentTimer > 0);
-        span.innerText = this.currentTimer > 0 ? (this.currentTimer < 60 ? `${this.currentTimer}s` : (this.currentTimer < 3600 ? `${this.currentTimer/60}m` : '1h')) : '';
-        if (navigator.vibrate) navigator.vibrate(10);
-    }
-
     toggleChatSearch() {
         this.isSearching = !this.isSearching;
         const container = document.getElementById('chat-search-container');
@@ -1038,10 +976,6 @@ class HamsterApp {
                 chatId, image: imageData, senderId: this.user.uid, createdAt: serverTimestamp(), status: 'sent'
             };
             
-            if (this.currentTimer > 0) {
-                payload.expiresAt = new Date(Date.now() + (this.currentTimer * 1000));
-            }
-
             if (this.replyToMsgId) {
                 payload.replyTo = this.replyToMsgId;
             }
@@ -1080,10 +1014,6 @@ class HamsterApp {
                 chatId, text, senderId: this.user.uid, createdAt: serverTimestamp(), status: 'sent'
             };
             
-            if (this.currentTimer > 0) {
-                payload.expiresAt = new Date(Date.now() + (this.currentTimer * 1000));
-            }
-
             if (this.replyToMsgId) {
                 payload.replyTo = this.replyToMsgId;
             }
@@ -3213,14 +3143,6 @@ class HamsterApp {
                         <p>${this.lang === 'ar' ? 'حماية التطبيق برمز PIN' : 'Require PIN to open Hamster Chat'}</p>
                     </div>
                     <div class="toggle-switch ${appLockEnabled ? 'active' : ''}" onclick="app.toggleAppLock()"></div>
-                </div>
-
-                <div class="privacy-item">
-                    <div class="privacy-info">
-                        <h4>${this.lang === 'ar' ? 'حماية ضد التصوير (Web)' : 'Screen Protection (Web)'}</h4>
-                        <p>${this.lang === 'ar' ? 'منع النسخ والتشويش عند الخروج والتصوير' : 'Prevent copying and blur on focus loss'}</p>
-                    </div>
-                    <div class="toggle-switch ${this.userData?.privacy?.secureMode ? 'active' : ''}" onclick="app.togglePrivacy('secureMode')"></div>
                 </div>
 
                 <div class="privacy-item">
