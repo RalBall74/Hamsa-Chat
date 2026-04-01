@@ -747,6 +747,69 @@ class HamsterApp {
                 this.handleSendMessage(chatId);
             };
         }
+
+        // Ctrl+V Paste Image Support
+        const msgInput = document.getElementById('msg-input');
+        if (msgInput) {
+            msgInput.addEventListener('paste', (e) => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        e.preventDefault();
+                        const file = item.getAsFile();
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            this.showPasteImagePreview(ev.target.result, chatId);
+                        };
+                        reader.readAsDataURL(file);
+                        break;
+                    }
+                }
+            });
+        }
+    }
+
+    showPasteImagePreview(dataURL, chatId) {
+        document.getElementById('paste-preview-modal')?.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'paste-preview-modal';
+        modal.style.cssText = `
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center;
+        `;
+        modal.innerHTML = `
+            <div style="background: var(--glass-panel-solid); border: 1px solid var(--glass-border); border-radius: 20px; padding: 20px; max-width: 90vw; display: flex; flex-direction: column; align-items: center; gap: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+                <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--text-primary);">
+                    ${this.lang === 'ar' ? 'إرسال الصورة؟' : 'Send this image?'}
+                </h3>
+                <img src="${dataURL}" style="max-width: 100%; max-height: 50vh; border-radius: 12px; object-fit: contain; box-shadow: 0 8px 24px rgba(0,0,0,0.2);">
+                <div style="display: flex; gap: 12px; width: 100%;">
+                    <button onclick="document.getElementById('paste-preview-modal').remove()"
+                        style="flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-panel); color: var(--text-primary); cursor: pointer; font-size: 14px; font-weight: 500;">
+                        ${this.lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                    </button>
+                    <button id="paste-send-btn"
+                        style="flex: 1; padding: 12px; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--accent), var(--accent-light)); color: white; cursor: pointer; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(109,40,217,0.35);">
+                        ${this.lang === 'ar' ? 'إرسال' : 'Send'}
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        document.getElementById('paste-send-btn').onclick = async () => {
+            modal.remove();
+            await this.sendMessageWithMedia(chatId, dataURL);
+        };
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
     }
 
     async toggleArchive(chatId) {
