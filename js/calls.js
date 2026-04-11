@@ -109,6 +109,11 @@ export function extendCalls(HamsterApp) {
                 } else if (data.status === 'rejected' || data.status === 'ended') {
                     this.endCall(true);
                 }
+
+                // Handle Video Switch Request
+                if (data.status === 'answered' && data.requestedVideo && !this.isVideoCall) {
+                    this.handleVideoSwitchRequest();
+                }
             });
         } catch (e) {
             console.error("Start call error:", e);
@@ -161,9 +166,13 @@ export function extendCalls(HamsterApp) {
             await updateDoc(doc(db, 'calls', this.currentCallData.id), { status: 'answered', answeredAt: serverTimestamp() });
             
             if (this.activeCallListener) this.activeCallListener();
-            this.activeCallListener = onSnapshot(doc(db, 'calls', this.currentCallData.id), (docSnap) => {
+            this.activeCallListener = onSnapshot(doc(db, 'calls', this.currentCallData.id), async (docSnap) => {
                 if (!docSnap.exists() || docSnap.data().status === 'ended') {
                     this.endCall(true);
+                }
+                const data = docSnap.data();
+                if (data && data.requestedVideo && !this.isVideoCall) {
+                    this.handleVideoSwitchRequest();
                 }
             });
 
@@ -205,6 +214,8 @@ export function extendCalls(HamsterApp) {
         }
         this.currentCallData = null;
         this.isVideoCall = false;
+        this.isScreenSharing = false;
+        this.localScreenVideoTrack = null;
         clearInterval(this.callTimer);
     };
 
@@ -392,6 +403,18 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-outgoing').classList.remove('hidden');
         } else if (state === 'active') {
             document.getElementById('call-actions-active').classList.remove('hidden');
+            // Show Switch to Video button only if it's currently an audio call
+            const switchBtn = document.getElementById('call-switch-video-btn');
+            const camBtn = document.getElementById('call-cam-btn');
+            if (switchBtn && camBtn) {
+                if (!this.isVideoCall) {
+                    switchBtn.style.display = 'flex';
+                    camBtn.style.display = 'none';
+                } else {
+                    switchBtn.style.display = 'none';
+                    camBtn.style.display = 'flex';
+                }
+            }
         }
 
         document.getElementById('call-overlay').classList.remove('hidden');
@@ -418,5 +441,104 @@ export function extendCalls(HamsterApp) {
             const statusEl = document.getElementById('call-status');
             if (statusEl) statusEl.innerText = `${mins}:${secs}`;
         }, 1000);
+    };
+
+    HamsterApp.prototype.switchToVideo = async function() {
+        if (!this.currentCallData || this.currentCallData.status !== 'answered') return;
+        try {
+            await updateDoc(doc(db, 'calls', this.currentCallData.id), { requestedVideo: true });
+            // For the sender, just enable camera immediately
+            if (!this.isVideoCall) {
+                this.isVideoCall = true;
+                await this.toggleCameraCall(); 
+                document.getElementById('call-switch-video-btn').style.display = 'none';
+                document.getElementById('call-cam-btn').style.display = 'flex';
+            }
+        } catch (e) {
+            console.error("Switch video err:", e);
+        }
+    };
+
+    HamsterApp.prototype.handleVideoSwitchRequest = async function() {
+        if (this.videoRequestShown) return;
+        this.videoRequestShown = true;
+        
+        const accept = await new Promise((resolve) => {
+            this.showConfirm(
+                this.lang === 'ar' ? 'طلب تشغيل الكاميرا' : 'Video Request',
+                this.lang === 'ar' ? 'يريد الطرف الآخر الانتقال إلى مكالمة فيديو. هل توافق؟' : 'The other person wants to switch to a video call. Do you agree?',
+                (res) => resolve(res)
+            );
+        });
+
+        if (accept) {
+            this.isVideoCall = true;
+            await this.toggleCameraCall();
+            document.getElementById('call-switch-video-btn').style.display = 'none';
+            document.getElementById('call-cam-btn').style.display = 'flex';
+        }
+        
+        this.videoRequestShown = false;
+    };
+
+    HamsterApp.prototype.toggleScreenShare = async function() {
+        const btn = document.getElementById('call-screen-share-btn');
+        if (this.isScreenSharing) {
+            // STOP Screen Share
+            if (this.localScreenVideoTrack) {
+                this.localScreenVideoTrack.stop();
+                this.localScreenVideoTrack.close();
+                await this.agoraClient.unpublish([this.localScreenVideoTrack]);
+                this.localScreenVideoTrack = null;
+            }
+            
+            // Re-publish camera if it was on
+            if (this.isVideoCall && !this.localVideoTrack) {
+                this.localVideoTrack = await AgoraRTC.createCameraVideoTrack();
+                await this.agoraClient.publish([this.localVideoTrack]);
+                const localContainer = document.getElementById('local-video-container');
+                localContainer.style.display = 'block';
+                localContainer.innerHTML = '';
+                this.localVideoTrack.play(localContainer);
+            }
+
+            btn.style.background = 'rgba(255,255,255,0.1)';
+            btn.innerHTML = '<i data-lucide="monitor"></i>';
+            this.isScreenSharing = false;
+        } else {
+            // START Screen Share
+            try {
+                this.localScreenVideoTrack = await AgoraRTC.createScreenVideoTrack();
+                
+                // Unpublish camera track if active
+                if (this.localVideoTrack) {
+                    this.localVideoTrack.stop();
+                    this.localVideoTrack.close();
+                    await this.agoraClient.unpublish([this.localVideoTrack]);
+                    this.localVideoTrack = null;
+                    document.getElementById('local-video-container').style.display = 'none';
+                }
+
+                await this.agoraClient.publish([this.localScreenVideoTrack]);
+                
+                // Show screen in local preview
+                const localContainer = document.getElementById('local-video-container');
+                localContainer.style.display = 'block';
+                localContainer.innerHTML = '';
+                this.localScreenVideoTrack.play(localContainer);
+                
+                btn.style.background = '#10b981';
+                btn.innerHTML = '<i data-lucide="monitor-off"></i>';
+                this.isScreenSharing = true;
+
+                this.localScreenVideoTrack.on("track-ended", () => {
+                    if (this.isScreenSharing) this.toggleScreenShare();
+                });
+            } catch (e) {
+                console.error("Screen share err:", e);
+                this.showAlert('Error', this.lang === 'ar' ? 'تعذر بدء مشاركة الشاشة.' : 'Could not start screen share.');
+            }
+        }
+        if (window.lucide) lucide.createIcons();
     };
 }
