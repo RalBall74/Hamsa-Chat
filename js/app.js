@@ -346,9 +346,19 @@ class HamsterApp {
             const unreadCount = chat.unreadCounts?.[this.user.uid] || 0;
             const badgeHTML = unreadCount > 0 && chat.id !== this.activeChatId ? `<div class="unread-badge">${unreadCount > 99 ? '+99' : unreadCount}</div>` : '';
 
+            // Check for user story
+            const partnerId = chat.type === 'group' ? null : chat.memberIds.find(id => id !== this.user.uid);
+            let partnerStoryIds = [];
+            if (partnerId && this.allStories) {
+                partnerStoryIds = this.allStories.filter(s => s.uid === partnerId).map(s => s.id);
+            }
+            const hasStory = partnerStoryIds.length > 0;
+            const storyAvatarStyle = hasStory ? 'border: 2px solid var(--accent); padding: 2px; cursor: pointer;' : '';
+            const storyAvatarClick = hasStory ? `onclick="app.viewStory('${partnerStoryIds[0]}'); event.stopPropagation();"` : '';
+
             return `
                 <div class="chat-card ${active}" onclick="app.selectChat('${chat.id}')">
-                    <img src="${partner.photo || 'https://i.pravatar.cc/150'}" class="card-avatar">
+                    <img src="${partner.photo || 'https://i.pravatar.cc/150'}" class="card-avatar" style="${storyAvatarStyle}" ${storyAvatarClick}>
                     <div class="card-body">
                         <div class="card-top">
                             <h4>${partner.name}</h4>
@@ -365,6 +375,8 @@ class HamsterApp {
         } else {
             container.innerHTML = html;
         }
+
+        if (this.updateStoriesBadge) this.updateStoriesBadge();
     }
 
     async searchGlobalUsers(queryText, container, existingHTML) {

@@ -18,11 +18,40 @@ export function extendStories(HamsterApp) {
             this.allStories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             if (this.currentPage === 'stories') this.renderStoriesPage();
             
+            this.updateStoriesBadge && this.updateStoriesBadge();
+            this.renderFilteredChats && this.renderFilteredChats();
+            
             // Real-time update for open story
             if (this.activeStoryId) {
                 this.viewStory(this.activeStoryId);
             }
         });
+    };
+
+    HamsterApp.prototype.updateStoriesBadge = function() {
+        if (!this.allStories || !this.user) return;
+        
+        const contactUids = new Set();
+        (this.allChats || []).forEach(chat => {
+            (chat.memberIds || []).forEach(uid => {
+                if (uid !== this.user.uid) contactUids.add(uid);
+            });
+        });
+
+        const hasUnseen = this.allStories.some(s => 
+            s.uid !== this.user.uid && 
+            contactUids.has(s.uid) && 
+            (!s.viewers || !s.viewers.includes(this.user.uid))
+        );
+
+        const badge = document.getElementById('stories-nav-badge');
+        if (badge) {
+            if (hasUnseen) {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
     };
 
     HamsterApp.prototype.cleanupExpiredStories = async function() {

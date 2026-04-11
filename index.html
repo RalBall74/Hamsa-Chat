@@ -68,8 +68,10 @@
             <div class="nav-links">
                 <button class="nav-item active" data-page="chats" title="Messages"><i
                         data-lucide="message-circle"></i></button>
-                <button class="nav-item" data-page="stories" title="Stories"><i
-                        data-lucide="circle-dashed"></i></button>
+                <button class="nav-item" data-page="stories" title="Stories" style="position: relative;">
+                    <i data-lucide="circle-dashed"></i>
+                    <div id="stories-nav-badge" class="hidden" style="position: absolute; top: 6px; right: 8px; width: 10px; height: 10px; background: var(--danger); border-radius: 50%; box-shadow: 0 0 0 2px var(--glass-panel-solid); border: 1px solid white;"></div>
+                </button>
                 <button class="nav-item" data-page="archive" title="Archive"><i data-lucide="archive"></i></button>
             </div>
             <div class="nav-bottom">
