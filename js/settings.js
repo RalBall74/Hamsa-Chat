@@ -27,7 +27,7 @@ export function extendSettings(HamsterApp) {
                 </div>
                 <div class="form-group">
                     <label>${this.t('display_name')}</label>
-                    <input type="text" id="prof-name" value="${this.userData.displayName}" autocomplete="off">
+                    <input type="text" id="prof-name" value="${this.userData.displayName}" maxlength="18" autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label>${this.t('email_user_placeholder')}</label>
@@ -78,6 +78,7 @@ export function extendSettings(HamsterApp) {
         const n = document.getElementById('prof-name').value.trim();
         const u = document.getElementById('prof-user').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
         if (!n || !u) return this.showAlert(this.lang === 'ar' ? 'تنبيه' : 'Alert', this.lang === 'ar' ? 'الحقول لا يمكن أن تكون فارغة.' : 'Fields cannot be empty.');
+        if (n.length > 18) return this.showAlert(this.lang === 'ar' ? 'اسم طويل' : 'Name Too Long', this.lang === 'ar' ? 'يجب أن يكون الاسم 18 حرفاً كحد أقصى.' : 'Name must be 18 characters maximum.');
         if (u.length < 3) return this.showAlert(this.lang === 'ar' ? 'يوزرنيم قصير' : 'Too Short', this.lang === 'ar' ? 'يجب أن يكون اليوزرنيم 3 أحرف على الأقل.' : 'Username must be at least 3 characters.');
         try {
             if (u !== this.userData?.username) {

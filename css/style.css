@@ -299,6 +299,7 @@ body::before {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 4px;
+    gap: 10px;
 }
 
 .card-top h4 {
@@ -307,9 +308,8 @@ body::before {
     color: var(--text-primary);
     margin: 0;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 140px;
+    flex: 1;
+    min-width: 0;
 }
 
 .card-body p {

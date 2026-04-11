@@ -351,7 +351,8 @@ class HamsterApp {
                     <img src="${partner.photo || 'https://i.pravatar.cc/150'}" class="card-avatar">
                     <div class="card-body">
                         <div class="card-top">
-                            <h4 style="display: flex; justify-content: space-between; align-items: center; width: 100%;">${partner.name} ${badgeHTML}</h4>
+                            <h4>${partner.name}</h4>
+                            ${badgeHTML}
                         </div>
                         <p class="${isTyping ? 'typing-indicator' : ''}">${lastMsg}</p>
                     </div>
