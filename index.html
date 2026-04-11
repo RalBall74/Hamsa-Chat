@@ -235,7 +235,20 @@
     </div>
 
     <!-- Call Status Overlay -->
-    <div id="call-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.92); backdrop-filter: blur(10px); z-index: 10000; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+    <div id="call-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.92); backdrop-filter: blur(10px); z-index: 10000; display: flex; align-items: center; justify-content: center; flex-direction: column; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
+        <!-- Call Top Bar (Visible in full mode) -->
+        <div id="call-top-bar" style="position: absolute; top: 0; left: 0; right: 0; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; z-index: 5;">
+            <div id="call-network-quality" title="Network Quality" style="display: flex; align-items: center; gap: 8px; color: #10b981; font-size: 13px; font-weight: 600; background: rgba(0,0,0,0.3); padding: 6px 12px; border-radius: 20px; backdrop-filter: blur(5px);">
+                <i data-lucide="signal"></i>
+                <span>Excellent</span>
+            </div>
+            <button onclick="app.toggleCallMinimize()" style="background: rgba(255,255,255,0.1); border: none; width: 44px; height: 44px; border-radius: 12px; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); transition: all 0.2s;">
+                <i data-lucide="minimize-2"></i>
+            </button>
+        </div>
+
+        <audio id="call-ringtone-audio" src="assets/audio/callringtone.mp3" loop></audio>
+
         <!-- Remote Video (full background) -->
         <div id="remote-video-container" style="position: absolute; inset: 0; z-index: 0; display: none;"></div>
         <!-- Local Video (small pip) -->

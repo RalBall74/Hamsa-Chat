@@ -37,6 +37,8 @@ export function extendCalls(HamsterApp) {
             const typeLabel = this.isVideoCall 
                 ? (this.lang === 'ar' ? 'مكالمة فيديو واردة...' : 'Incoming Video Call...') 
                 : (this.lang === 'ar' ? 'مكالمة صوتية واردة...' : 'Incoming Voice Call...');
+            
+            this.playRingtone();
             this.showCallOverlay(callerName, callerPhoto, 'incoming', typeLabel);
         });
     };
@@ -82,6 +84,7 @@ export function extendCalls(HamsterApp) {
             const statusLabel = this.isVideoCall
                 ? (this.lang === 'ar' ? 'مكالمة فيديو...' : 'Video Calling...')
                 : (this.lang === 'ar' ? 'جاري الاتصال...' : 'Calling...');
+            this.playRingtone();
             this.showCallOverlay(partner.name, partner.photo, 'outgoing', statusLabel);
 
             // Listen for answer/reject
@@ -93,6 +96,7 @@ export function extendCalls(HamsterApp) {
                 }
                 const data = docSnap.data();
                 if (data.status === 'answered') {
+                    this.stopRingtone();
                     this.currentCallData.status = 'answered';
                     document.getElementById('call-status').innerText = '00:00';
                     document.getElementById('call-actions-outgoing').classList.add('hidden');
@@ -112,10 +116,37 @@ export function extendCalls(HamsterApp) {
         }
     };
 
+    HamsterApp.prototype.playRingtone = function() {
+        const audio = document.getElementById('call-ringtone-audio');
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.warn("Ringtone play failed:", e));
+        }
+    };
+
+    HamsterApp.prototype.stopRingtone = function() {
+        const audio = document.getElementById('call-ringtone-audio');
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+    };
+
+    HamsterApp.prototype.toggleCallMinimize = function() {
+        const overlay = document.getElementById('call-overlay');
+        const isMinimized = overlay.classList.toggle('minimized');
+        const btn = document.querySelector('#call-top-bar button i');
+        if (btn) {
+            btn.setAttribute('data-lucide', isMinimized ? 'maximize-2' : 'minimize-2');
+            if (window.lucide) lucide.createIcons();
+        }
+    };
+
     HamsterApp.prototype.answerCall = async function() {
         if (!this.currentCallData || this.currentCallData.status !== 'calling') return;
         
         try {
+            this.stopRingtone();
             this.currentCallData.status = 'answered';
             
             document.getElementById('call-actions-incoming').classList.add('hidden');
@@ -166,6 +197,7 @@ export function extendCalls(HamsterApp) {
         }
 
         this.leaveAgoraChannel();
+        this.stopRingtone();
         this.hideCallOverlay();
         if (this.activeCallListener) {
             this.activeCallListener();
@@ -208,6 +240,24 @@ export function extendCalls(HamsterApp) {
                     // Re-show avatar if remote stops video
                     document.getElementById('call-avatar').style.display = 'block';
                     document.getElementById('call-name').style.display = 'block';
+                }
+            });
+
+            this.agoraClient.on("network-quality", (quality) => {
+                const indicator = document.getElementById('call-network-quality');
+                const label = indicator.querySelector('span');
+                const icon = indicator.querySelector('i');
+                
+                // 0: Unknown, 1: Excellent, 2: Good, 3: Poor, 4: Bad, 5: Very Bad, 6: Down
+                if (quality.downlinkNetworkQuality <= 2) {
+                    indicator.style.color = '#10b981';
+                    label.innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
+                } else if (quality.downlinkNetworkQuality <= 4) {
+                    indicator.style.color = '#f59e0b';
+                    label.innerText = this.lang === 'ar' ? 'ضعيف' : 'Poor';
+                } else {
+                    indicator.style.color = '#ef4444';
+                    label.innerText = this.lang === 'ar' ? 'سيء جداً' : 'Bad';
                 }
             });
         }
@@ -349,9 +399,12 @@ export function extendCalls(HamsterApp) {
     };
 
     HamsterApp.prototype.hideCallOverlay = function() {
-        document.getElementById('call-overlay').classList.add('hidden');
+        const overlay = document.getElementById('call-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('minimized');
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
+        this.stopRingtone();
         clearInterval(this.callTimer);
     };
 
