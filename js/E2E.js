@@ -1,4 +1,4 @@
-import { db, doc, getDoc, updateDoc } from './firebase-config.js';
+import { db, doc, getDoc, updateDoc, setDoc } from './firebase-config.js';
 
 export function extendE2E(HamsterApp) {
 
@@ -13,6 +13,13 @@ export function extendE2E(HamsterApp) {
                 this.privateKey = await this.importPrivateKey(storedKey);
                 this.publicKey = await this.importPublicKey(storedPubKey);
                 console.log("E2E Keys loaded from local storage.");
+
+                // Auto-healing: Ensure public key exists in Firestore
+                const userDoc = await getDoc(doc(db, 'users', this.user.uid));
+                if (!userDoc.exists() || !userDoc.data().publicKey) {
+                    await setDoc(doc(db, 'users', this.user.uid), { publicKey: storedPubKey }, { merge: true });
+                    console.log("E2E public key self-healed in Firestore.");
+                }
             } catch (e) {
                 console.error("Failed to load E2E keys, generating new ones...");
                 await this.generateE2EKeys();
@@ -44,9 +51,9 @@ export function extendE2E(HamsterApp) {
         localStorage.setItem(`hamster_e2e_priv_${this.user.uid}`, JSON.stringify(expPriv));
         localStorage.setItem(`hamster_e2e_pub_${this.user.uid}`, JSON.stringify(expPub));
         
-        await updateDoc(doc(db, 'users', this.user.uid), {
+        await setDoc(doc(db, 'users', this.user.uid), {
             publicKey: JSON.stringify(expPub)
-        });
+        }, { merge: true });
         console.log("E2E Keys generated and synced.");
     };
 
