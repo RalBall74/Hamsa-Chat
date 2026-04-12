@@ -101,7 +101,9 @@ export function extendCalls(HamsterApp) {
                     document.getElementById('call-status').innerText = '00:00';
                     document.getElementById('call-actions-outgoing').classList.add('hidden');
                     document.getElementById('call-actions-active').classList.remove('hidden');
-                    document.getElementById('call-cam-btn').style.display = 'flex';
+                    if (this.isVideoCall) {
+                        document.getElementById('call-cam-btn').style.display = 'flex';
+                    }
                     this.startCallTimer();
                     await this.joinAgoraChannel(data.channelName);
                 } else if (data.status === 'rejected' || data.status === 'ended') {
@@ -151,12 +153,12 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-active').classList.remove('hidden');
             document.getElementById('call-status').innerText = '00:00';
             // Show camera button for video calls
+            if (this.isVideoCall) {
+                document.getElementById('call-cam-btn').style.display = 'flex';
+            }
             this.startCallTimer();
-            this.stopRingtone();
 
             await updateDoc(doc(db, 'calls', this.currentCallData.id), { status: 'answered', answeredAt: serverTimestamp() });
-            
-            document.getElementById('call-cam-btn').style.display = 'flex';
             
             if (this.activeCallListener) this.activeCallListener();
             this.activeCallListener = onSnapshot(doc(db, 'calls', this.currentCallData.id), (docSnap) => {
@@ -249,13 +251,13 @@ export function extendCalls(HamsterApp) {
                 // 0: Unknown, 1: Excellent, 2: Good, 3: Poor, 4: Bad, 5: Very Bad, 6: Down
                 if (quality.downlinkNetworkQuality <= 2) {
                     indicator.style.color = '#10b981';
-                    label.innerText = this.t('net_excellent');
+                    label.innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
                 } else if (quality.downlinkNetworkQuality <= 4) {
                     indicator.style.color = '#f59e0b';
-                    label.innerText = this.t('net_poor');
+                    label.innerText = this.lang === 'ar' ? 'ضعيف' : 'Poor';
                 } else {
                     indicator.style.color = '#ef4444';
-                    label.innerText = this.t('net_bad');
+                    label.innerText = this.lang === 'ar' ? 'سيء جداً' : 'Bad';
                 }
             });
         }
@@ -380,7 +382,7 @@ export function extendCalls(HamsterApp) {
         document.getElementById('call-actions-incoming').classList.add('hidden');
         document.getElementById('call-actions-outgoing').classList.add('hidden');
         document.getElementById('call-actions-active').classList.add('hidden');
-        document.getElementById('call-cam-btn').style.display = (state === 'active' || this.isVideoCall) ? 'flex' : 'none';
+        document.getElementById('call-cam-btn').style.display = 'none';
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
 
