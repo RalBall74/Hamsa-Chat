@@ -103,6 +103,11 @@ class HamsterApp {
                 this.closeAttachmentMenu();
             }
         });
+
+        // Initialize Call Dragging
+        if (typeof this.initCallDragging === 'function') {
+            this.initCallDragging();
+        }
     }
 
     registerSW() {

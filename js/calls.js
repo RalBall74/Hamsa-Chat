@@ -101,8 +101,18 @@ export function extendCalls(HamsterApp) {
                     document.getElementById('call-status').innerText = '00:00';
                     document.getElementById('call-actions-outgoing').classList.add('hidden');
                     document.getElementById('call-actions-active').classList.remove('hidden');
-                    // Always show camera button to allow switching
-                    document.getElementById('call-cam-btn').style.display = 'flex';
+                    
+                    const camBtn = document.getElementById('call-cam-btn');
+                    camBtn.style.display = 'flex';
+                    if (this.isVideoCall) {
+                        camBtn.style.background = 'rgba(255,255,255,0.1)';
+                        camBtn.innerHTML = '<i data-lucide="video"></i>';
+                    } else {
+                        camBtn.style.background = '#ef4444';
+                        camBtn.innerHTML = '<i data-lucide="video-off"></i>';
+                    }
+                    if (window.lucide) lucide.createIcons();
+
                     this.startCallTimer();
                     await this.joinAgoraChannel(data.channelName);
                 } else if (data.status === 'rejected' || data.status === 'ended') {
@@ -151,8 +161,18 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-incoming').classList.add('hidden');
             document.getElementById('call-actions-active').classList.remove('hidden');
             document.getElementById('call-status').innerText = '00:00';
-            // Always show camera button to allow switching
-            document.getElementById('call-cam-btn').style.display = 'flex';
+            
+            const camBtn = document.getElementById('call-cam-btn');
+            camBtn.style.display = 'flex';
+            if (this.isVideoCall) {
+                camBtn.style.background = 'rgba(255,255,255,0.1)';
+                camBtn.innerHTML = '<i data-lucide="video"></i>';
+            } else {
+                camBtn.style.background = '#ef4444';
+                camBtn.innerHTML = '<i data-lucide="video-off"></i>';
+            }
+            if (window.lucide) lucide.createIcons();
+            
             this.startCallTimer();
 
             await updateDoc(doc(db, 'calls', this.currentCallData.id), { status: 'answered', answeredAt: serverTimestamp() });
@@ -251,9 +271,6 @@ export function extendCalls(HamsterApp) {
                     label.innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
                 } else if (quality.downlinkNetworkQuality <= 4) {
                     indicator.style.color = '#f59e0b';
-                    label.innerText = this.lang === 'ar' ? 'جيد' : 'Good';
-                } else if (quality.downlinkNetworkQuality <= 5) {
-                    indicator.style.color = '#ef4444';
                     label.innerText = this.lang === 'ar' ? 'ضعيف' : 'Poor';
                 } else {
                     indicator.style.color = '#ef4444';
@@ -383,12 +400,14 @@ export function extendCalls(HamsterApp) {
         document.getElementById('call-actions-outgoing').classList.add('hidden');
         document.getElementById('call-actions-active').classList.add('hidden');
         document.getElementById('call-cam-btn').style.display = 'none';
-        
-        // Ensure draggable is initialized
-        this.initCallDraggable();
-
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
+
+        const netIndicator = document.getElementById('call-network-quality');
+        if (netIndicator) {
+            netIndicator.querySelector('span').innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
+            netIndicator.style.color = '#10b981';
+        }
 
         if (state === 'incoming') {
             document.getElementById('call-actions-incoming').classList.remove('hidden');
@@ -396,7 +415,6 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-outgoing').classList.remove('hidden');
         } else if (state === 'active') {
             document.getElementById('call-actions-active').classList.remove('hidden');
-            document.getElementById('call-cam-btn').style.display = 'flex';
         }
 
         document.getElementById('call-overlay').classList.remove('hidden');
@@ -407,6 +425,11 @@ export function extendCalls(HamsterApp) {
         const overlay = document.getElementById('call-overlay');
         overlay.classList.add('hidden');
         overlay.classList.remove('minimized');
+        
+        // Reset drag style
+        overlay.style.transform = '';
+        overlay.classList.remove('dragging');
+        
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
         this.stopRingtone();
@@ -425,57 +448,52 @@ export function extendCalls(HamsterApp) {
         }, 1000);
     };
 
-    HamsterApp.prototype.initCallDraggable = function() {
+    HamsterApp.prototype.initCallDragging = function() {
         const overlay = document.getElementById('call-overlay');
-        if (overlay.dataset.draggableInit) return;
-        overlay.dataset.draggableInit = "true";
-
         let isDragging = false;
         let startX, startY, initialX, initialY;
 
-        const onStart = (e) => {
+        const dragStart = (e) => {
             if (!overlay.classList.contains('minimized')) return;
+            // Prevent drag if clicking on buttons
+            if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
+            
             isDragging = true;
-            const event = e.type.includes('touch') ? e.touches[0] : e;
-            startX = event.clientX;
-            startY = event.clientY;
-            
-            const rect = overlay.getBoundingClientRect();
-            initialX = rect.left;
-            initialY = rect.top;
-            
-            overlay.style.transition = 'none';
+            overlay.classList.add('dragging');
+            const touch = e.touches ? e.touches[0] : e;
+            startX = touch.clientX;
+            startY = touch.clientY;
+
+            // Get current transform
+            const style = window.getComputedStyle(overlay);
+            const matrix = new WebKitCSSMatrix(style.transform);
+            initialX = matrix.m41;
+            initialY = matrix.m42;
+        };
+
+        const dragAction = (e) => {
+            if (!isDragging) return;
             e.preventDefault();
+            const touch = e.touches ? e.touches[0] : e;
+            const currentX = touch.clientX - startX;
+            const currentY = touch.clientY - startY;
+            
+            overlay.style.transform = `translate(${initialX + currentX}px, ${initialY + currentY}px)`;
         };
 
-        const onMove = (e) => {
-            if (!isDragging) return;
-            const event = e.type.includes('touch') ? e.touches[0] : e;
-            const dx = event.clientX - startX;
-            const dy = event.clientY - startY;
-            
-            const newX = initialX + dx;
-            const newY = initialY + dy;
-            
-            overlay.style.left = `${newX}px`;
-            overlay.style.top = `${newY}px`;
-            overlay.style.right = 'auto';
-            overlay.style.bottom = 'auto';
-            overlay.style.inset = 'auto';
-        };
-
-        const onEnd = () => {
-            if (!isDragging) return;
+        const dragEnd = () => {
             isDragging = false;
-            overlay.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            overlay.classList.remove('dragging');
         };
 
-        overlay.addEventListener('mousedown', onStart);
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onEnd);
-
-        overlay.addEventListener('touchstart', onStart, { passive: false });
-        window.addEventListener('touchmove', onMove, { passive: false });
-        window.addEventListener('touchend', onEnd);
+        // Attach events
+        overlay.addEventListener('mousedown', dragStart);
+        overlay.addEventListener('touchstart', dragStart, { passive: false });
+        
+        document.addEventListener('mousemove', dragAction);
+        document.addEventListener('touchmove', dragAction, { passive: false });
+        
+        document.addEventListener('mouseup', dragEnd);
+        document.addEventListener('touchend', dragEnd);
     };
 }
