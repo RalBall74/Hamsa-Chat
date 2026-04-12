@@ -464,8 +464,8 @@ class HamsterApp {
         const chat = this.allChats.find(c => c.id === chatId);
         if (!chat) return;
 
-        // Reset unread count
-        if (chat.unreadCounts && chat.unreadCounts[this.user.uid] > 0) {
+        // Reset unread count (only if NOT in ghost mode)
+        if (!this.userData?.privacy?.ghostMode && chat.unreadCounts && chat.unreadCounts[this.user.uid] > 0) {
             chat.unreadCounts[this.user.uid] = 0;
             updateDoc(doc(db, 'chats', chatId), {
                 [`unreadCounts.${this.user.uid}`]: 0
@@ -574,7 +574,15 @@ class HamsterApp {
                     <button class="mobile-back-btn" onclick="event.stopPropagation(); app.closeMobileOverlay()"><i data-lucide="chevron-left"></i></button>
                     <img src="${partner.photo}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; margin-left: 4px;">
                     <div style="display: flex; flex-direction: column; justify-content: center; min-width: 0; margin-left: 8px;">
-                        <h3 style="font-size: 15px; font-weight: 600; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${partner.name}</h3>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <h3 style="font-size: 15px; font-weight: 600; margin: 0; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${partner.name}</h3>
+                            ${this.userData?.privacy?.ghostMode ? `
+                                <div title="Ghost Mode Active" style="display: flex; align-items: center; gap: 4px; background: rgba(139, 92, 246, 0.1); color: #8b5cf6; padding: 2px 6px; border-radius: 6px; font-size: 9px; font-weight: 700; text-transform: uppercase; border: 1px solid rgba(139, 92, 246, 0.2);">
+                                    <i data-lucide="ghost" style="width: 10px; height: 10px;"></i>
+                                    Ghost
+                                </div>
+                            ` : ''}
+                        </div>
                         <div style="display: flex; align-items: center; gap: 4px;">
                             <span id="chat-status" style="font-size: 11px; color: ${isTyping ? 'var(--online)' : 'var(--text-secondary)'}; font-weight: 500; line-height: 1.2; margin-top: 1px; white-space: nowrap;">${statusText}</span>
                             ${isTyping ? `
@@ -1190,16 +1198,17 @@ class HamsterApp {
         // Mention Logic
         this.handleMentionSuggestions(chatId);
 
-        // Update Firestore to typing: true
+        // Update Firestore to typing: true (Skipped in Ghost Mode)
+        const isGhost = this.userData?.privacy?.ghostMode;
         const chatRef = doc(db, 'chats', chatId);
         const updateObj = {};
         updateObj[`typing.${this.user.uid}`] = true;
-        if (chatId !== this.user.uid + '_ai') await updateDoc(chatRef, updateObj);
+        if (chatId !== this.user.uid + '_ai' && !isGhost) await updateDoc(chatRef, updateObj);
 
         this.typingTimeout = setTimeout(async () => {
             const stopObj = {};
             stopObj[`typing.${this.user.uid}`] = false;
-            if (chatId !== this.user.uid + '_ai') await updateDoc(chatRef, stopObj);
+            if (chatId !== this.user.uid + '_ai' && !isGhost) await updateDoc(chatRef, stopObj);
         }, 2000);
     }
 
