@@ -44,7 +44,8 @@ class HamsterApp {
                 app_theme: "App Theme", light_mode: "Light Mode", dark_mode: "Dark Mode",
                 desktop_notifs: "Enable Desktop Notifications", read_receipts: "Broadcast Read Meta-Receipts",
                 commit: "Commit Changes", language: "Language", english: "English", arabic: "Arabic",
-                display_name: "Display Name", about_app: "About Hamster Chat"
+                display_name: "Display Name", about_app: "About Hamster Chat",
+                net_excellent: "Excellent", net_poor: "Poor", net_bad: "Bad"
             },
             ar: {
                 chats: "المحادثات", messages: "الرسائل", stories: "القصص", archive: "الأرشيف", settings: "التفضيلات",
@@ -58,7 +59,8 @@ class HamsterApp {
                 app_theme: "سمة التطبيق", light_mode: "الوضع المضيء", dark_mode: "الوضع الليلي",
                 desktop_notifs: "تفعيل تنبيهات المتصفح", read_receipts: "بث مؤشرات قراءة الرسائل",
                 commit: "حفظ التغييرات", language: "اللغة", english: "English", arabic: "العربية",
-                display_name: "الاسم المستعار", about_app: "عن التطبيق"
+                display_name: "الاسم المستعار", about_app: "عن التطبيق",
+                net_excellent: "ممتاز", net_poor: "ضعيف", net_bad: "سيء جداً"
             }
         };
 
@@ -103,11 +105,6 @@ class HamsterApp {
                 this.closeAttachmentMenu();
             }
         });
-
-        // Initialize Call Dragging
-        if (typeof this.initCallDragging === 'function') {
-            this.initCallDragging();
-        }
     }
 
     registerSW() {

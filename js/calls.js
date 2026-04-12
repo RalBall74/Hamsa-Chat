@@ -101,18 +101,7 @@ export function extendCalls(HamsterApp) {
                     document.getElementById('call-status').innerText = '00:00';
                     document.getElementById('call-actions-outgoing').classList.add('hidden');
                     document.getElementById('call-actions-active').classList.remove('hidden');
-                    
-                    const camBtn = document.getElementById('call-cam-btn');
-                    camBtn.style.display = 'flex';
-                    if (this.isVideoCall) {
-                        camBtn.style.background = 'rgba(255,255,255,0.1)';
-                        camBtn.innerHTML = '<i data-lucide="video"></i>';
-                    } else {
-                        camBtn.style.background = '#ef4444';
-                        camBtn.innerHTML = '<i data-lucide="video-off"></i>';
-                    }
-                    if (window.lucide) lucide.createIcons();
-
+                    document.getElementById('call-cam-btn').style.display = 'flex';
                     this.startCallTimer();
                     await this.joinAgoraChannel(data.channelName);
                 } else if (data.status === 'rejected' || data.status === 'ended') {
@@ -161,21 +150,13 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-incoming').classList.add('hidden');
             document.getElementById('call-actions-active').classList.remove('hidden');
             document.getElementById('call-status').innerText = '00:00';
-            
-            const camBtn = document.getElementById('call-cam-btn');
-            camBtn.style.display = 'flex';
-            if (this.isVideoCall) {
-                camBtn.style.background = 'rgba(255,255,255,0.1)';
-                camBtn.innerHTML = '<i data-lucide="video"></i>';
-            } else {
-                camBtn.style.background = '#ef4444';
-                camBtn.innerHTML = '<i data-lucide="video-off"></i>';
-            }
-            if (window.lucide) lucide.createIcons();
-            
+            // Show camera button for video calls
             this.startCallTimer();
+            this.stopRingtone();
 
             await updateDoc(doc(db, 'calls', this.currentCallData.id), { status: 'answered', answeredAt: serverTimestamp() });
+            
+            document.getElementById('call-cam-btn').style.display = 'flex';
             
             if (this.activeCallListener) this.activeCallListener();
             this.activeCallListener = onSnapshot(doc(db, 'calls', this.currentCallData.id), (docSnap) => {
@@ -268,13 +249,13 @@ export function extendCalls(HamsterApp) {
                 // 0: Unknown, 1: Excellent, 2: Good, 3: Poor, 4: Bad, 5: Very Bad, 6: Down
                 if (quality.downlinkNetworkQuality <= 2) {
                     indicator.style.color = '#10b981';
-                    label.innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
+                    label.innerText = this.t('net_excellent');
                 } else if (quality.downlinkNetworkQuality <= 4) {
                     indicator.style.color = '#f59e0b';
-                    label.innerText = this.lang === 'ar' ? 'ضعيف' : 'Poor';
+                    label.innerText = this.t('net_poor');
                 } else {
                     indicator.style.color = '#ef4444';
-                    label.innerText = this.lang === 'ar' ? 'سيء جداً' : 'Bad';
+                    label.innerText = this.t('net_bad');
                 }
             });
         }
@@ -399,15 +380,9 @@ export function extendCalls(HamsterApp) {
         document.getElementById('call-actions-incoming').classList.add('hidden');
         document.getElementById('call-actions-outgoing').classList.add('hidden');
         document.getElementById('call-actions-active').classList.add('hidden');
-        document.getElementById('call-cam-btn').style.display = 'none';
+        document.getElementById('call-cam-btn').style.display = (state === 'active' || this.isVideoCall) ? 'flex' : 'none';
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
-
-        const netIndicator = document.getElementById('call-network-quality');
-        if (netIndicator) {
-            netIndicator.querySelector('span').innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
-            netIndicator.style.color = '#10b981';
-        }
 
         if (state === 'incoming') {
             document.getElementById('call-actions-incoming').classList.remove('hidden');
@@ -425,11 +400,6 @@ export function extendCalls(HamsterApp) {
         const overlay = document.getElementById('call-overlay');
         overlay.classList.add('hidden');
         overlay.classList.remove('minimized');
-        
-        // Reset drag style
-        overlay.style.transform = '';
-        overlay.classList.remove('dragging');
-        
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
         this.stopRingtone();
@@ -446,54 +416,5 @@ export function extendCalls(HamsterApp) {
             const statusEl = document.getElementById('call-status');
             if (statusEl) statusEl.innerText = `${mins}:${secs}`;
         }, 1000);
-    };
-
-    HamsterApp.prototype.initCallDragging = function() {
-        const overlay = document.getElementById('call-overlay');
-        let isDragging = false;
-        let startX, startY, initialX, initialY;
-
-        const dragStart = (e) => {
-            if (!overlay.classList.contains('minimized')) return;
-            // Prevent drag if clicking on buttons
-            if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
-            
-            isDragging = true;
-            overlay.classList.add('dragging');
-            const touch = e.touches ? e.touches[0] : e;
-            startX = touch.clientX;
-            startY = touch.clientY;
-
-            // Get current transform
-            const style = window.getComputedStyle(overlay);
-            const matrix = new WebKitCSSMatrix(style.transform);
-            initialX = matrix.m41;
-            initialY = matrix.m42;
-        };
-
-        const dragAction = (e) => {
-            if (!isDragging) return;
-            e.preventDefault();
-            const touch = e.touches ? e.touches[0] : e;
-            const currentX = touch.clientX - startX;
-            const currentY = touch.clientY - startY;
-            
-            overlay.style.transform = `translate(${initialX + currentX}px, ${initialY + currentY}px)`;
-        };
-
-        const dragEnd = () => {
-            isDragging = false;
-            overlay.classList.remove('dragging');
-        };
-
-        // Attach events
-        overlay.addEventListener('mousedown', dragStart);
-        overlay.addEventListener('touchstart', dragStart, { passive: false });
-        
-        document.addEventListener('mousemove', dragAction);
-        document.addEventListener('touchmove', dragAction, { passive: false });
-        
-        document.addEventListener('mouseup', dragEnd);
-        document.addEventListener('touchend', dragEnd);
     };
 }
