@@ -89,6 +89,7 @@ class HamsterApp {
         this.setupNav();
         this.setupSearch();
         this.handleNavigation('chats');
+        this.renderSkeletons('sidebar-list', 6);
         lucide.createIcons();
         this.registerSW();
 
@@ -206,12 +207,19 @@ class HamsterApp {
                 emptyState.classList.add('hidden');
                 document.getElementById('chat-window').classList.remove('hidden');
             }
+            // Show skeletons before rendering filtered chats if nothing loaded yet
+            if (this.allChats.length === 0) {
+                this.renderSkeletons('sidebar-list', 5);
+            }
             this.renderFilteredChats();
         } else if (page === 'stories') {
             mainActionBtn.classList.add('hidden');
+            emptyState.classList.add('hidden');
+            this.renderSkeletons('page-content', 3);
             this.renderStoriesPage();
         } else if (page === 'settings') {
             mainActionBtn.classList.add('hidden');
+            emptyState.classList.add('hidden');
             this.renderSettingsPage();
         } else if (page === 'profile') {
             mainActionBtn.classList.add('hidden');
@@ -329,6 +337,11 @@ class HamsterApp {
 
         const container = document.getElementById('sidebar-list');
         if (displayChats.length === 0 && !queryText) {
+            if (this.allChats.length === 0) {
+                // Initial load: show skeletons
+                this.renderSkeletons('sidebar-list', 5);
+                return;
+            }
             let msg = this.t('no_convs');
             if (this.currentPage === 'archive') msg = this.t('zero_archived');
             container.innerHTML = `<div class="info-state">${msg}</div>`;
