@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hamster-chat-v20';
+const CACHE_NAME = 'hamster-chat-v21';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -23,7 +23,7 @@ const STATIC_ASSETS = [
     './assets/audio/callringtone.mp3',
     './assets/icons/icon-192.png',
     './assets/icons/app_icon_512_1772927838563.png',
-    'https://unpkg.com/lucide@latest',
+    'https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js',
     'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap',
     'https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js',
     'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js',
@@ -59,6 +59,8 @@ self.addEventListener('activate', event => {
 // Fetch Strategy
 self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET') return;
+
+    const requestURL = new URL(event.request.url);
 
     // Navigation fallback: if network fails for a page request, return index.html
     const isNavigation = event.request.mode === 'navigate';
