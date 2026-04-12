@@ -162,36 +162,20 @@ export function extendUI(HamsterApp) {
         }
     };
 
-    HamsterApp.prototype.renderSkeletons = function(containerId, count = 5) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        
-        let html = '';
-        for(let i=0; i<count; i++) {
-            html += `
-                <div class="skeleton-card">
-                    <div class="skeleton-avatar skeleton"></div>
-                    <div class="skeleton-body">
-                        <div class="skeleton-line title skeleton"></div>
-                        <div class="skeleton-line subtitle skeleton"></div>
-                    </div>
-                </div>
-            `;
-        }
-        container.innerHTML = html;
-    };
-
     HamsterApp.prototype.updateOnlineStatus = function() {
         const isOnline = navigator.onLine;
-        const msg = this.lang === 'ar' ? 'أنت الآن تعمل بدون إنترنت' : 'You are currently offline';
-        const indicator = document.getElementById('offline-indicator');
-        if (indicator) {
-            indicator.querySelector('span').innerText = msg;
-            if (!isOnline) {
-                indicator.classList.add('visible');
-            } else {
-                indicator.classList.remove('visible');
+        let indicator = document.getElementById('offline-indicator');
+        if (!isOnline) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'offline-indicator';
+                indicator.style.cssText = `position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(239, 68, 68, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500; z-index: 9999; backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;`;
+                indicator.innerHTML = '<i data-lucide="wifi-off" style="width: 14px; height: 14px;"></i> Working Offline';
+                document.body.appendChild(indicator);
+                if (window.lucide) lucide.createIcons({ node: indicator });
             }
+        } else {
+            if (indicator) indicator.remove();
         }
     };
 

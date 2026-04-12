@@ -62,12 +62,6 @@
 </head>
 
 <body>
-    
-    <div id="offline-indicator">
-        <i data-lucide="wifi-off"></i>
-        <span>${this.lang === 'ar' ? 'أنت الآن تعمل بدون إنترنت' : 'You are currently offline'}</span>
-    </div>
-
     <!-- App Container -->
     <div id="hamster-app" class="hidden">
         <!-- Sidebar Navigation -->
@@ -106,7 +100,36 @@
             </header>
 
             <div id="sidebar-list" class="scrollbar-hidden">
-                <div class="info-state" style="margin-top: 50px;">Initializing Hamster...</div>
+                <div id="sidebar-skeletons">
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-line"></div>
+                            <div class="skeleton skeleton-line short"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-line"></div>
+                            <div class="skeleton skeleton-line short"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-line"></div>
+                            <div class="skeleton skeleton-line short"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-line"></div>
+                            <div class="skeleton skeleton-line short"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <button id="main-action-btn" class="fab-btn">
