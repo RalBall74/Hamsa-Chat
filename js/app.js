@@ -310,10 +310,6 @@ class HamsterApp {
 
         let displayChats = this.allChats;
 
-        if (!displayChats) {
-            return; // index.html already shows skeletons by default
-        }
-
         if (this.currentPage === 'archive') {
             displayChats = displayChats.filter(c => c.archivedBy && c.archivedBy.includes(this.user.uid));
         } else {

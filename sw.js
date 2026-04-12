@@ -1,7 +1,8 @@
-const CACHE_NAME = 'hamster-chat-v19';
+const CACHE_NAME = 'hamster-chat-v20';
 const STATIC_ASSETS = [
     './',
     './index.html',
+    './manifest.json',
     './css/variables.css',
     './css/style.css',
     './css/glass.css',
@@ -18,10 +19,17 @@ const STATIC_ASSETS = [
     './js/media.js',
     './js/E2E.js',
     './assets/logo.jpg',
+    './assets/Google.png',
+    './assets/audio/callringtone.mp3',
     './assets/icons/icon-192.png',
     './assets/icons/app_icon_512_1772927838563.png',
     'https://unpkg.com/lucide@latest',
-    'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap'
+    'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap',
+    'https://download.agora.io/sdk/release/AgoraRTC_N-4.22.0.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js',
+    'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js'
 ];
 
 // Install: Cache static assets
@@ -48,26 +56,36 @@ self.addEventListener('activate', event => {
     self.clients.claim();
 });
 
-// Fetch: Network First falling back to Cache
+// Fetch Strategy
 self.addEventListener('fetch', event => {
-    // Skip non-GET requests (like Firebase analytics)
     if (event.request.method !== 'GET') return;
 
+    // Navigation fallback: if network fails for a page request, return index.html
+    const isNavigation = event.request.mode === 'navigate';
+    
     event.respondWith(
         fetch(event.request)
             .then(networkResponse => {
-                // If network works, clone it and put in cache
-                return caches.open(CACHE_NAME).then(cache => {
-                    // Only cache successful responses and some external ones
-                    if (networkResponse.status === 200 || networkResponse.type === 'opaque') {
-                        cache.put(event.request, networkResponse.clone());
-                    }
-                    return networkResponse;
-                });
+                // If network works, cache and return
+                if (networkResponse.status === 200 || networkResponse.type === 'opaque') {
+                    const responseClone = networkResponse.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseClone);
+                    });
+                }
+                return networkResponse;
             })
             .catch(() => {
-                // If network fails, try the cache
-                return caches.match(event.request);
+                // If network fails, try cache
+                return caches.match(event.request).then(cachedResponse => {
+                    if (cachedResponse) return cachedResponse;
+                    
+                    // Specific fallback for navigation
+                    if (isNavigation) {
+                        return caches.match('./index.html');
+                    }
+                    return null;
+                });
             })
     );
 });
