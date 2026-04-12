@@ -2271,7 +2271,7 @@ body::before {
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* Call Mini Overlay (PiP Mode) */
+/* PiP Mode */
 #call-overlay.minimized {
     inset: auto;
     bottom: 25px;
@@ -2282,6 +2282,9 @@ body::before {
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
     overflow: hidden;
+    cursor: move;
+    user-select: none;
+    touch-action: none;
 }
 
 #call-overlay.minimized #call-top-bar {
@@ -2323,4 +2326,4 @@ body::before {
     #call-overlay.minimized #call-center-ui {
         transform: scale(0.5);
     }
-}
+}

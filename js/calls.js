@@ -101,18 +101,12 @@ export function extendCalls(HamsterApp) {
                     document.getElementById('call-status').innerText = '00:00';
                     document.getElementById('call-actions-outgoing').classList.add('hidden');
                     document.getElementById('call-actions-active').classList.remove('hidden');
-                    if (this.isVideoCall) {
-                        document.getElementById('call-cam-btn').style.display = 'flex';
-                    }
+                    // Always show camera button to allow switching
+                    document.getElementById('call-cam-btn').style.display = 'flex';
                     this.startCallTimer();
                     await this.joinAgoraChannel(data.channelName);
                 } else if (data.status === 'rejected' || data.status === 'ended') {
                     this.endCall(true);
-                }
-
-                // Handle Video Switch Request
-                if (data.status === 'answered' && data.requestedVideo && !this.isVideoCall) {
-                    this.handleVideoSwitchRequest();
                 }
             });
         } catch (e) {
@@ -157,22 +151,16 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-incoming').classList.add('hidden');
             document.getElementById('call-actions-active').classList.remove('hidden');
             document.getElementById('call-status').innerText = '00:00';
-            // Show camera button for video calls
-            if (this.isVideoCall) {
-                document.getElementById('call-cam-btn').style.display = 'flex';
-            }
+            // Always show camera button to allow switching
+            document.getElementById('call-cam-btn').style.display = 'flex';
             this.startCallTimer();
 
             await updateDoc(doc(db, 'calls', this.currentCallData.id), { status: 'answered', answeredAt: serverTimestamp() });
             
             if (this.activeCallListener) this.activeCallListener();
-            this.activeCallListener = onSnapshot(doc(db, 'calls', this.currentCallData.id), async (docSnap) => {
+            this.activeCallListener = onSnapshot(doc(db, 'calls', this.currentCallData.id), (docSnap) => {
                 if (!docSnap.exists() || docSnap.data().status === 'ended') {
                     this.endCall(true);
-                }
-                const data = docSnap.data();
-                if (data && data.requestedVideo && !this.isVideoCall) {
-                    this.handleVideoSwitchRequest();
                 }
             });
 
@@ -214,8 +202,6 @@ export function extendCalls(HamsterApp) {
         }
         this.currentCallData = null;
         this.isVideoCall = false;
-        this.isScreenSharing = false;
-        this.localScreenVideoTrack = null;
         clearInterval(this.callTimer);
     };
 
@@ -265,6 +251,9 @@ export function extendCalls(HamsterApp) {
                     label.innerText = this.lang === 'ar' ? 'ممتاز' : 'Excellent';
                 } else if (quality.downlinkNetworkQuality <= 4) {
                     indicator.style.color = '#f59e0b';
+                    label.innerText = this.lang === 'ar' ? 'جيد' : 'Good';
+                } else if (quality.downlinkNetworkQuality <= 5) {
+                    indicator.style.color = '#ef4444';
                     label.innerText = this.lang === 'ar' ? 'ضعيف' : 'Poor';
                 } else {
                     indicator.style.color = '#ef4444';
@@ -394,6 +383,10 @@ export function extendCalls(HamsterApp) {
         document.getElementById('call-actions-outgoing').classList.add('hidden');
         document.getElementById('call-actions-active').classList.add('hidden');
         document.getElementById('call-cam-btn').style.display = 'none';
+        
+        // Ensure draggable is initialized
+        this.initCallDraggable();
+
         document.getElementById('remote-video-container').style.display = 'none';
         document.getElementById('local-video-container').style.display = 'none';
 
@@ -403,18 +396,7 @@ export function extendCalls(HamsterApp) {
             document.getElementById('call-actions-outgoing').classList.remove('hidden');
         } else if (state === 'active') {
             document.getElementById('call-actions-active').classList.remove('hidden');
-            // Show Switch to Video button only if it's currently an audio call
-            const switchBtn = document.getElementById('call-switch-video-btn');
-            const camBtn = document.getElementById('call-cam-btn');
-            if (switchBtn && camBtn) {
-                if (!this.isVideoCall) {
-                    switchBtn.style.display = 'flex';
-                    camBtn.style.display = 'none';
-                } else {
-                    switchBtn.style.display = 'none';
-                    camBtn.style.display = 'flex';
-                }
-            }
+            document.getElementById('call-cam-btn').style.display = 'flex';
         }
 
         document.getElementById('call-overlay').classList.remove('hidden');
@@ -443,102 +425,57 @@ export function extendCalls(HamsterApp) {
         }, 1000);
     };
 
-    HamsterApp.prototype.switchToVideo = async function() {
-        if (!this.currentCallData || this.currentCallData.status !== 'answered') return;
-        try {
-            await updateDoc(doc(db, 'calls', this.currentCallData.id), { requestedVideo: true });
-            // For the sender, just enable camera immediately
-            if (!this.isVideoCall) {
-                this.isVideoCall = true;
-                await this.toggleCameraCall(); 
-                document.getElementById('call-switch-video-btn').style.display = 'none';
-                document.getElementById('call-cam-btn').style.display = 'flex';
-            }
-        } catch (e) {
-            console.error("Switch video err:", e);
-        }
-    };
+    HamsterApp.prototype.initCallDraggable = function() {
+        const overlay = document.getElementById('call-overlay');
+        if (overlay.dataset.draggableInit) return;
+        overlay.dataset.draggableInit = "true";
 
-    HamsterApp.prototype.handleVideoSwitchRequest = async function() {
-        if (this.videoRequestShown) return;
-        this.videoRequestShown = true;
-        
-        const accept = await new Promise((resolve) => {
-            this.showConfirm(
-                this.lang === 'ar' ? 'طلب تشغيل الكاميرا' : 'Video Request',
-                this.lang === 'ar' ? 'يريد الطرف الآخر الانتقال إلى مكالمة فيديو. هل توافق؟' : 'The other person wants to switch to a video call. Do you agree?',
-                (res) => resolve(res)
-            );
-        });
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
 
-        if (accept) {
-            this.isVideoCall = true;
-            await this.toggleCameraCall();
-            document.getElementById('call-switch-video-btn').style.display = 'none';
-            document.getElementById('call-cam-btn').style.display = 'flex';
-        }
-        
-        this.videoRequestShown = false;
-    };
-
-    HamsterApp.prototype.toggleScreenShare = async function() {
-        const btn = document.getElementById('call-screen-share-btn');
-        if (this.isScreenSharing) {
-            // STOP Screen Share
-            if (this.localScreenVideoTrack) {
-                this.localScreenVideoTrack.stop();
-                this.localScreenVideoTrack.close();
-                await this.agoraClient.unpublish([this.localScreenVideoTrack]);
-                this.localScreenVideoTrack = null;
-            }
+        const onStart = (e) => {
+            if (!overlay.classList.contains('minimized')) return;
+            isDragging = true;
+            const event = e.type.includes('touch') ? e.touches[0] : e;
+            startX = event.clientX;
+            startY = event.clientY;
             
-            // Re-publish camera if it was on
-            if (this.isVideoCall && !this.localVideoTrack) {
-                this.localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-                await this.agoraClient.publish([this.localVideoTrack]);
-                const localContainer = document.getElementById('local-video-container');
-                localContainer.style.display = 'block';
-                localContainer.innerHTML = '';
-                this.localVideoTrack.play(localContainer);
-            }
+            const rect = overlay.getBoundingClientRect();
+            initialX = rect.left;
+            initialY = rect.top;
+            
+            overlay.style.transition = 'none';
+            e.preventDefault();
+        };
 
-            btn.style.background = 'rgba(255,255,255,0.1)';
-            btn.innerHTML = '<i data-lucide="monitor"></i>';
-            this.isScreenSharing = false;
-        } else {
-            // START Screen Share
-            try {
-                this.localScreenVideoTrack = await AgoraRTC.createScreenVideoTrack();
-                
-                // Unpublish camera track if active
-                if (this.localVideoTrack) {
-                    this.localVideoTrack.stop();
-                    this.localVideoTrack.close();
-                    await this.agoraClient.unpublish([this.localVideoTrack]);
-                    this.localVideoTrack = null;
-                    document.getElementById('local-video-container').style.display = 'none';
-                }
+        const onMove = (e) => {
+            if (!isDragging) return;
+            const event = e.type.includes('touch') ? e.touches[0] : e;
+            const dx = event.clientX - startX;
+            const dy = event.clientY - startY;
+            
+            const newX = initialX + dx;
+            const newY = initialY + dy;
+            
+            overlay.style.left = `${newX}px`;
+            overlay.style.top = `${newY}px`;
+            overlay.style.right = 'auto';
+            overlay.style.bottom = 'auto';
+            overlay.style.inset = 'auto';
+        };
 
-                await this.agoraClient.publish([this.localScreenVideoTrack]);
-                
-                // Show screen in local preview
-                const localContainer = document.getElementById('local-video-container');
-                localContainer.style.display = 'block';
-                localContainer.innerHTML = '';
-                this.localScreenVideoTrack.play(localContainer);
-                
-                btn.style.background = '#10b981';
-                btn.innerHTML = '<i data-lucide="monitor-off"></i>';
-                this.isScreenSharing = true;
+        const onEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            overlay.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+        };
 
-                this.localScreenVideoTrack.on("track-ended", () => {
-                    if (this.isScreenSharing) this.toggleScreenShare();
-                });
-            } catch (e) {
-                console.error("Screen share err:", e);
-                this.showAlert('Error', this.lang === 'ar' ? 'تعذر بدء مشاركة الشاشة.' : 'Could not start screen share.');
-            }
-        }
-        if (window.lucide) lucide.createIcons();
+        overlay.addEventListener('mousedown', onStart);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onEnd);
+
+        overlay.addEventListener('touchstart', onStart, { passive: false });
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onEnd);
     };
 }
