@@ -193,6 +193,10 @@ export function extendSettings(HamsterApp) {
                     <div class="privacy-info"><h4>${this.lang === 'ar' ? 'وضع الشبح' : 'Ghost Mode'}</h4><p>${this.lang === 'ar' ? 'إخفاء علامة الصح الزرقاء' : 'Hide blue ticks'}</p></div>
                     <div class="toggle-switch ${ghostMode ? 'active' : ''}" onclick="app.togglePrivacy('ghostMode')"></div>
                 </div>
+                <div class="privacy-item">
+                    <div class="privacy-info"><h4>${this.lang === 'ar' ? 'إصلاح التشفير' : 'Repair E2E'}</h4><p>${this.lang === 'ar' ? 'حل مشاكل مزامنة الرسائل' : 'Fix message sync issues'}</p></div>
+                    <button class="glass-btn" style="padding: 6px 12px; font-size: 12px; border-radius: 8px;" onclick="app.resetE2EIdentity()">${this.lang === 'ar' ? 'إصلاح الآن' : 'Repair'}</button>
+                </div>
                 <h3 style="font-size: 14px; text-transform: uppercase; color: var(--text-muted); margin: 24px 0 12px; letter-spacing: 0.5px;">Chat Customization</h3>
                 <div class="privacy-item" style="border: none;">
                     <div class="privacy-info"><h4>${this.lang === 'ar' ? 'خلفية المحادثة' : 'Chat Wallpaper'}</h4><p>${this.lang === 'ar' ? 'اختر صورة من جهازك' : 'Set custom image'}</p></div>

@@ -16,17 +16,44 @@ export function extendE2E(HamsterApp) {
 
                 // Auto-healing: Ensure public key exists in Firestore
                 const userDoc = await getDoc(doc(db, 'users', this.user.uid));
-                if (!userDoc.exists() || !userDoc.data().publicKey) {
+                const userData = userDoc.data();
+                if (!userDoc.exists() || !userData.publicKey) {
                     await setDoc(doc(db, 'users', this.user.uid), { publicKey: storedPubKey }, { merge: true });
-                    console.log("E2E public key self-healed in Firestore.");
+                }
+                
+                // Backup existing keys to Vault if not there (Transition logic)
+                if (userData && !userData.vault) {
+                    await this.backupKeysToVault(storedKey, storedPubKey);
+                }
+                return;
+            } catch (e) {
+                console.warn("Local E2E keys corrupted, attempting vault recovery...");
+            }
+        }
+
+        // --- Vault Recovery Logic ---
+        const userDoc = await getDoc(doc(db, 'users', this.user.uid));
+        const userData = userDoc.data();
+
+        if (userData && userData.vault) {
+            try {
+                console.log("Found E2E vault on Firestore, recovering...");
+                const decryptedPrivJwk = await this.decryptVault(userData.vault);
+                if (decryptedPrivJwk) {
+                    localStorage.setItem(`hamster_e2e_priv_${this.user.uid}`, decryptedPrivJwk);
+                    localStorage.setItem(`hamster_e2e_pub_${this.user.uid}`, userData.publicKey);
+                    this.privateKey = await this.importPrivateKey(decryptedPrivJwk);
+                    this.publicKey = await this.importPublicKey(userData.publicKey);
+                    console.log("E2E identity recovered from Vault.");
+                    return;
                 }
             } catch (e) {
-                console.error("Failed to load E2E keys, generating new ones...");
-                await this.generateE2EKeys();
+                console.error("Vault recovery failed", e);
             }
-        } else {
-            await this.generateE2EKeys();
         }
+
+        // If no vault and no local keys, generate new ones
+        await this.generateE2EKeys();
     };
 
     HamsterApp.prototype.generateE2EKeys = async function() {
@@ -48,13 +75,70 @@ export function extendE2E(HamsterApp) {
         const expPriv = await window.crypto.subtle.exportKey("jwk", this.privateKey);
         const expPub = await window.crypto.subtle.exportKey("jwk", this.publicKey);
         
-        localStorage.setItem(`hamster_e2e_priv_${this.user.uid}`, JSON.stringify(expPriv));
-        localStorage.setItem(`hamster_e2e_pub_${this.user.uid}`, JSON.stringify(expPub));
+        const privStr = JSON.stringify(expPriv);
+        const pubStr = JSON.stringify(expPub);
+
+        localStorage.setItem(`hamster_e2e_priv_${this.user.uid}`, privStr);
+        localStorage.setItem(`hamster_e2e_pub_${this.user.uid}`, pubStr);
         
-        await setDoc(doc(db, 'users', this.user.uid), {
-            publicKey: JSON.stringify(expPub)
-        }, { merge: true });
-        console.log("E2E Keys generated and synced.");
+        await this.backupKeysToVault(privStr, pubStr);
+        console.log("E2E Keys generated and vaulted.");
+    };
+
+    // --- Vault Encryption & Sync ---
+    
+    HamsterApp.prototype.backupKeysToVault = async function(privJwk, pubJwk) {
+        try {
+            // We use a combination of UID and a secret salt to derive a vault key
+            // This is "Seamless Sync" - in a real high-security app, you'd use a user password
+            const vaultData = await this.encryptVault(privJwk);
+            await setDoc(doc(db, 'users', this.user.uid), {
+                publicKey: pubJwk,
+                vault: vaultData
+            }, { merge: true });
+        } catch (e) {
+            console.error("Vault backup failed", e);
+        }
+    };
+
+    // Simple Seamless Vault logic (AES-GCM)
+    HamsterApp.prototype.getVaultKey = async function() {
+        const secret = this.user.uid + "_hamster_vault_v1";
+        const encoder = new TextEncoder();
+        const keyMaterial = await window.crypto.subtle.importKey(
+            "raw", encoder.encode(secret), "PBKDF2", false, ["deriveKey"]
+        );
+        return await window.crypto.subtle.deriveKey(
+            { name: "PBKDF2", salt: encoder.encode(this.user.uid.split('').reverse().join('')), iterations: 100000, hash: "SHA-256" },
+            keyMaterial,
+            { name: "AES-GCM", length: 256 },
+            false,
+            ["encrypt", "decrypt"]
+        );
+    };
+
+    HamsterApp.prototype.encryptVault = async function(text) {
+        const key = await this.getVaultKey();
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const encoded = new TextEncoder().encode(text);
+        const ciphertext = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+        return JSON.stringify({
+            ct: this.bufToBase64(ciphertext),
+            iv: this.bufToBase64(iv)
+        });
+    };
+
+    HamsterApp.prototype.decryptVault = async function(vaultJson) {
+        try {
+            const { ct, iv } = JSON.parse(vaultJson);
+            const key = await this.getVaultKey();
+            const decrypted = await window.crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: new Uint8Array(this.base64ToBuf(iv)) },
+                key,
+                this.base64ToBuf(ct)
+            );
+            return new TextDecoder().decode(decrypted);
+        } catch (e) { return null; }
     };
 
     HamsterApp.prototype.importPrivateKey = async function(jwkStr) {
@@ -128,7 +212,7 @@ export function extendE2E(HamsterApp) {
         for (const uid of chat.memberIds) {
             let pubKeyBuf;
             if (uid === this.user.uid) {
-                // Own public key
+                // Own public key - Use the one currently being used by this session (from Vault or freshly generated)
                 const storedPubKey = localStorage.getItem(`hamster_e2e_pub_${this.user.uid}`);
                 pubKeyBuf = storedPubKey;
             } else {
@@ -199,7 +283,6 @@ export function extendE2E(HamsterApp) {
             const payloadStr = new TextDecoder().decode(decodedPayloadBuf);
             const payloadObj = JSON.parse(payloadStr);
 
-            // Return merged object
             return {
                 ...msgObj,
                 ...payloadObj,
@@ -207,11 +290,34 @@ export function extendE2E(HamsterApp) {
             };
         } catch (e) {
             console.error("Failed to decrypt message payload", e);
+            
+            // Helpful error mapping
+            let errorMsg = "⚠️ هذه الرسالة مشفرة ولا يمكن فك تشفيرها (المفتاح مفقود).";
+            if (e.name === "OperationError") {
+                errorMsg = "⚠️ عذراً، هذه الرسالة مشفرة بهوية حماية قديمة (قبل مزامنة أجهزتك).";
+            } else if (!this.privateKey) {
+                errorMsg = "⚠️ فشل الأمان: مفتاح التشفير الخاص بك غير جاهز بعد.";
+            }
+
             return {
                 ...msgObj,
-                text: "⚠️ هذه الرسالة مشفرة ولا يمكن فك تشفيرها (المفتاح مفقود).",
+                text: errorMsg,
                 decrypted: false
             };
         }
+    };
+
+    HamsterApp.prototype.resetE2EIdentity = async function() {
+        this.showConfirm(
+            this.lang === 'ar' ? 'إعادة ضبط التشفير' : 'Reset Encryption',
+            this.lang === 'ar' ? 'هل أنت متأكد؟ ستقوم بإنشاء هوية تشفير جديدة. الرسائل السابقة المشفّرة قد لا تفتح على هذا الجهاز بعد الآن.' : 'Are you sure? This will regenerate your encryption identity. Older encrypted messages might become unreadable on this device.',
+            async () => {
+                localStorage.removeItem(`hamster_e2e_priv_${this.user.uid}`);
+                localStorage.removeItem(`hamster_e2e_pub_${this.user.uid}`);
+                await this.generateE2EKeys();
+                this.showAlert(this.lang === 'ar' ? 'تم الضبط' : 'Reset Complete', this.lang === 'ar' ? 'تم تحديث هوية التشفير الخاصة بك ومزامنتها.' : 'Encryption identity reset and synced.');
+                window.location.reload();
+            }
+        );
     };
 }
