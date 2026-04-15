@@ -247,8 +247,25 @@ export function extendE2E(HamsterApp) {
     };
 
     HamsterApp.prototype.decryptMessagePayload = async function(msgObj) {
-        if (!msgObj.isE2E || !msgObj.keys || !msgObj.keys[this.user.uid] || !this.privateKey) {
-            return msgObj; // Not E2E or we can't decrypt it
+        if (!msgObj.isE2E) return msgObj;
+
+        // Fallback for non-participants (e.g. Admin or third-party view)
+        if (!msgObj.keys || !msgObj.keys[this.user.uid]) {
+            return {
+                ...msgObj,
+                text: (this.lang === 'ar' ? '🔒 محتوى مشفّر' : '🔒 Encrypted Content'),
+                decrypted: false,
+                isEncryptedPlaceholder: true
+            };
+        }
+
+        // Fallback if local keys haven't loaded yet (Vault recovery in progress)
+        if (!this.privateKey) {
+            return {
+                ...msgObj,
+                text: (this.lang === 'ar' ? '🔒 جارٍ استعادة مفاتيح الأمان...' : '🔒 Loading Security Keys...'),
+                decrypted: false
+            };
         }
 
         try {
